@@ -285,4 +285,30 @@ export async function storeSetWindow(key: string, state: WindowState, windowMs: 
   fileWrite(key, state, ttl);
 }
 
+/** Typed JSON read (Redis STRING or local file). Null on missing/expired/malformed. */
+export async function storeGetJson<T = unknown>(key: string): Promise<T | null> {
+  if (parseRedisUrl()) {
+    try {
+      const v = await redisCommand(['GET', key]);
+      if (typeof v !== 'string' || !v) return null;
+      return JSON.parse(v) as T;
+    } catch (e) { warnFallback(e); }
+  }
+  const d = fileRead(key);
+  if (!d) return null;
+  return d.v as T;
+}
+
+/** Typed JSON write (Redis STRING or local file). */
+export async function storeSetJson(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+  if (parseRedisUrl()) {
+    try {
+      const payload = JSON.stringify(value);
+      await redisCommand(ttlSeconds ? ['SET', key, payload, 'EX', String(ttlSeconds)] : ['SET', key, payload]);
+      return;
+    } catch (e) { warnFallback(e); }
+  }
+  fileWrite(key, value, ttlSeconds);
+}
+
 function now() { return Date.now(); }

@@ -3,6 +3,7 @@ import { runPipeline, STAGES } from '@/lib/pipeline';
 import { RunRequest, SourceId, Objective, ReportFormat, PipelineMode, TimeFrame } from '@/lib/types';
 import { runWindowFor, consumeRun, clientUid } from '@/lib/usage';
 import { saveRun } from '@/lib/runs';
+import { hydrateStoredKeys } from '@/lib/keys';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,9 @@ export async function POST(req: NextRequest) {
   const { req: run, error } = validate(body);
   const encoder = new TextEncoder();
   const uid = clientUid(req);
+  // Cold instances may lack keys saved via the settings UI — pull them from
+  // the shared store before the pipeline reads them.
+  await hydrateStoredKeys();
   const rl = await runWindowFor(uid);
 
   const stream = new ReadableStream({
@@ -111,7 +115,7 @@ export async function POST(req: NextRequest) {
       send({ type: 'log', text: 'Pipeline started — agent booting.', tone: 'info' });
       try {
         const result = await runPipeline(run!, send);
-        saveRun(uid, run!, result);
+        await saveRun(uid, run!, result);
       } catch (err) {
         send({ type: 'error', message: (err as Error).message ?? String(err) });
       } finally {

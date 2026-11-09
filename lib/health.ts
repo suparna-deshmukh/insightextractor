@@ -1,7 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import { SourceId } from './types';
-import { ensureDataDir } from './store';
+import { storeGetJson, storeSetJson } from './store';
 
 export interface ProviderHealth {
   fails: number;
@@ -13,57 +11,45 @@ export interface ProviderHealth {
 
 export type HealthMap = Record<string, ProviderHealth>;
 
-const FILE = path.join(ensureDataDir(), 'health.json');
-let cache: HealthMap = {};
+const KEY = 'ie:health';
 
 function keyOf(source: SourceId, provider: string) {
   return `${source}:${provider}`;
 }
 
-let loaded = false;
-export function loadHealth(): HealthMap {
-  if (loaded) return cache;
-  try {
-    const data = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    cache = data && typeof data === 'object' ? data : {};
-  } catch {
-    cache = {};
-  }
-  loaded = true;
-  return cache;
+/**
+ * Provider health ledger in the shared KV store: one small JSON map for
+ * every source:provider pair, shared across all instances. Fail-open — an
+ * unreadable store simply looks like a fresh ledger.
+ */
+export async function loadHealth(): Promise<HealthMap> {
+  const data = await storeGetJson<HealthMap>(KEY);
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
 
-function persist() {
-  try {
-    fs.mkdirSync(path.dirname(FILE), { recursive: true });
-    fs.writeFileSync(FILE, JSON.stringify(cache ?? {}, null, 1));
-  } catch {
-    /* ephemeral filesystem (e.g. Vercel) — in-memory only */
-  }
-}
-
-export function recordSuccess(source: SourceId, provider: string) {
-  const map = loadHealth();
+async function record(source: SourceId, provider: string, patch: (h: ProviderHealth) => void): Promise<void> {
+  const map = await loadHealth();
   const k = keyOf(source, provider);
   const h = map[k] ?? { fails: 0, successes: 0 };
-  h.successes += 1;
-  h.lastSuccessAt = Date.now();
-  h.lastError = undefined;
+  patch(h);
   map[k] = h;
-  cache = map;
-  persist();
+  await storeSetJson(KEY, map);
 }
 
-export function recordFailure(source: SourceId, provider: string, error: string) {
-  const map = loadHealth();
-  const k = keyOf(source, provider);
-  const h = map[k] ?? { fails: 0, successes: 0 };
-  h.fails += 1;
-  h.lastFailAt = Date.now();
-  h.lastError = error.slice(0, 200);
-  map[k] = h;
-  cache = map;
-  persist();
+export async function recordSuccess(source: SourceId, provider: string): Promise<void> {
+  return record(source, provider, (h) => {
+    h.successes += 1;
+    h.lastSuccessAt = Date.now();
+    h.lastError = undefined;
+  });
+}
+
+export async function recordFailure(source: SourceId, provider: string, error: string): Promise<void> {
+  return record(source, provider, (h) => {
+    h.fails += 1;
+    h.lastFailAt = Date.now();
+    h.lastError = error.slice(0, 200);
+  });
 }
 
 /**
@@ -71,8 +57,8 @@ export function recordFailure(source: SourceId, provider: string, error: string)
  * ties keep static order. A provider that fails twice sinks below providers
  * that work; a success promotes it again.
  */
-export function orderProviders<T extends { id: string }>(source: SourceId, providers: T[]): T[] {
-  const map = loadHealth();
+export async function orderProviders<T extends { id: string }>(source: SourceId, providers: T[]): Promise<T[]> {
+  const map = await loadHealth();
   const scored = providers.map((p, i) => {
     const h = map[keyOf(source, p.id)];
     const score = (h?.successes ?? 0) - (h?.fails ?? 0) * 3;
@@ -82,8 +68,8 @@ export function orderProviders<T extends { id: string }>(source: SourceId, provi
   return scored.map((x) => x.p);
 }
 
-export function healthSnapshot(sources: { source: SourceId; providers: { id: string; name: string; requiresKey?: string }[] }[]) {
-  const map = loadHealth();
+export async function healthSnapshot(sources: { source: SourceId; providers: { id: string; name: string; requiresKey?: string }[] }[]) {
+  const map = await loadHealth();
   return sources.map((s) => ({
     source: s.source,
     providers: s.providers.map((p) => {

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getKey, setKey } from '@/lib/keys';
+import { getKey, setKey, hydrateStoredKeys } from '@/lib/keys';
 
 export const dynamic = 'force-dynamic';
 
 const BLOCKED = new Set(['PATH', 'HOME', 'PWD', 'NODE_ENV', 'NODE_OPTIONS', 'PORT', 'HOSTNAME']);
 
 export async function GET() {
+  await hydrateStoredKeys();
   return NextResponse.json({
     gemini: { set: Boolean(getKey('GEMINI_API_KEY')), model: getKey('GEMINI_MODEL') || process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
     producthunt: { set: Boolean(getKey('PRODUCTHUNT_API_TOKEN')) },
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   for (const [k, v] of Object.entries(body)) {
     if (typeof v !== 'string' || !v.trim()) continue;
     if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(k) || BLOCKED.has(k)) continue;
-    setKey(k, v.trim());
+    await setKey(k, v.trim());
     updated.push(k);
   }
   if (!updated.length) return NextResponse.json({ error: 'No valid keys (names must be UPPER_SNAKE_CASE).' }, { status: 400 });

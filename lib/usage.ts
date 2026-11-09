@@ -10,7 +10,7 @@ export function runWindowConfig(): { limit: number; windowMs: number } {
   };
 }
 
-function hashUid(uid: string): string {
+export function hashUid(uid: string): string {
   return crypto.createHash('sha256').update(uid || 'local').digest('hex').slice(0, 16);
 }
 

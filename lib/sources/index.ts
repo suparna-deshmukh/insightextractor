@@ -7,7 +7,7 @@ import { META as GH_META, PROVIDERS as GH_PROVIDERS, JOBS as GH_JOBS } from './g
 import { META as GOOGLE_META, PROVIDERS as GOOGLE_PROVIDERS, JOBS as GOOGLE_JOBS } from './google';
 import { META as PH_META, PROVIDERS as PH_PROVIDERS, JOBS as PH_JOBS } from './producthunt';
 import { META as YT_META, PROVIDERS as YT_PROVIDERS, JOBS as YT_JOBS } from './youtube';
-import { orderProviders, recordSuccess, recordFailure, loadHealth } from '../health';
+import { orderProviders, recordSuccess, recordFailure, loadHealth, HealthMap } from '../health';
 import { providerError, withTimeout } from './provider';
 import { getKey } from '../keys';
 import { dedupe } from './hn';
@@ -83,7 +83,7 @@ export async function fetchPlatform(
 ): Promise<PlatformFetch> {
   const def = SOURCES[source];
   const shards = def.jobs(plan, tf, mode).filter(Boolean);
-  const ordered = orderProviders(source, def.providers);
+  const ordered = await orderProviders(source, def.providers);
   const available = ordered.filter((p) => !p.requiresKey || getKey(p.requiresKey));
   const skipped: ProviderAttempt[] = ordered
     .filter((p) => p.requiresKey && !getKey(p.requiresKey))
@@ -131,7 +131,7 @@ export async function fanOut(
   mode: PipelineMode,
   log: (text: string, tone?: 'info' | 'ok' | 'warn' | 'error') => void
 ): Promise<{ records: EvidenceRecord[]; attempts: ProviderAttempt[] }> {
-  const ordered = orderProviders(source, def.providers);
+  const ordered = await orderProviders(source, def.providers);
   const available = ordered.filter((p) => !p.requiresKey || getKey(p.requiresKey));
   const K = Math.min(available.length, Math.max(1, shards.length));
   const active = available.slice(0, K);
@@ -175,11 +175,11 @@ export async function fanOut(
   const merged: EvidenceRecord[] = [];
   for (const r of results) {
     if (r.error) {
-      recordFailure(source, r.p.id, r.error);
+      await recordFailure(source, r.p.id, r.error);
       attempts.push({ provider: r.p.id, name: r.p.name, ok: false, error: r.error, ms: r.ms });
       log(`${def.meta.label}: ✗ ${r.p.name} failed (${r.error}, ${r.ms}ms) — other routes cover this`, 'warn');
     } else {
-      recordSuccess(source, r.p.id);
+      await recordSuccess(source, r.p.id);
       attempts.push({ provider: r.p.id, name: r.p.name, ok: true, records: r.recs.length, ms: r.ms });
       merged.push(...r.recs);
       log(`${def.meta.label}: ✓ ${r.p.name} → ${r.recs.length} records (${r.ms}ms)`, r.recs.length ? 'ok' : 'warn');
@@ -188,11 +188,11 @@ export async function fanOut(
 
   for (const r of rescues) {
     if (r.error) {
-      recordFailure(source, r.p.id, r.error);
+      await recordFailure(source, r.p.id, r.error);
       attempts.push({ provider: r.p.id, name: r.p.name, ok: false, error: r.error, ms: r.ms });
       log(`${def.meta.label}: ✗ ${r.p.name} (fallback for "${r.shard}") failed (${r.error}, ${r.ms}ms)`, 'warn');
     } else {
-      recordSuccess(source, r.p.id);
+      await recordSuccess(source, r.p.id);
       attempts.push({ provider: r.p.id, name: r.p.name, ok: true, records: r.recs.length, ms: r.ms });
       merged.push(...r.recs);
       log(`${def.meta.label}: ↻ ${r.p.name} rescued shard "${r.shard}" → ${r.recs.length} records (${r.ms}ms)`, 'ok');
@@ -210,6 +210,6 @@ export function sourceReadiness(): { id: SourceId; ready: boolean; keyHint?: str
   });
 }
 
-export function healthMap() {
-  return loadHealth();
+export async function healthMap(): Promise<HealthMap> {
+  return await loadHealth();
 }

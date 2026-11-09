@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SOURCE_LIST } from '@/lib/sources';
-import { getKey } from '@/lib/keys';
+import { getKey, hydrateStoredKeys } from '@/lib/keys';
 import { geminiUsage, hasGeminiKey } from '@/lib/gemini';
 import { loadHealth } from '@/lib/health';
 import { runWindowFor, clientUid } from '@/lib/usage';
@@ -8,7 +8,8 @@ import { runWindowFor, clientUid } from '@/lib/usage';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const health = loadHealth();
+  await hydrateStoredKeys();
+  const health = await loadHealth();
   const sources = SOURCE_LIST.map((s) => {
     const keyless = s.providers.every((p) => !p.requiresKey);
     const ready = keyless || s.providers.some((p) => !p.requiresKey || getKey(p.requiresKey));

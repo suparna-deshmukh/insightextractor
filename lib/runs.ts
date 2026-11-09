@@ -1,12 +1,10 @@
-import fs from 'fs';
-import path from 'path';
-import { RunRequest, RunResult } from './types';
-import { ensureDataDir } from './store';
+import { RunRequest, RunResult, Objective, SourceId, ReportFormat, PipelineMode } from './types';
+import { storeGetJson, storeSetJson } from './store';
+import { hashUid } from './usage';
 
-const FILE = path.join(ensureDataDir(), 'runs.json');
 const MAX_RUNS_PER_USER = 25;
 const MAX_STORED_LABELED = 200;
-const MAX_FILE_BYTES = 6_000_000;
+const RUN_TTL_SECONDS = 30 * 24 * 3600; // keep run history for 30 days
 
 export interface StoredRun {
   id: string;
@@ -15,54 +13,20 @@ export interface StoredRun {
   result: RunResult;
 }
 
-interface RunStore { runs: Record<string, StoredRun[]> }
-
-function load(): RunStore {
-  try {
-    const data = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    if (data && typeof data.runs === 'object') return data;
-  } catch {
-    /* first run */
-  }
-  return { runs: {} };
+export interface RunSummary {
+  id: string;
+  ts: number;
+  topic: string;
+  objective: Objective;
+  platforms: SourceId[];
+  keptRecords: number;
+  durationMs: number;
+  format: ReportFormat;
+  mode: PipelineMode;
 }
 
-function save(store: RunStore) {
-  try {
-    fs.mkdirSync(path.dirname(FILE), { recursive: true });
-    let json = JSON.stringify(store);
-    // Ephemeral on Vercel, fine on disk locally: if the file balloons, trim oldest runs.
-    while (json.length > MAX_FILE_BYTES) {
-      let trimmed = false;
-      for (const uid of Object.keys(store.runs)) {
-        if (store.runs[uid].length > 1) {
-          store.runs[uid].pop();
-          trimmed = true;
-        }
-      }
-      if (!trimmed) break;
-      json = JSON.stringify(store);
-    }
-    fs.writeFileSync(FILE, json);
-  } catch {
-    /* best effort */
-  }
-}
-
-export function saveRun(uid: string, request: RunRequest, result: RunResult): string {
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const slim: RunResult = { ...result, labeled: result.labeled.slice(0, MAX_STORED_LABELED) };
-  const store = load();
-  const list = Array.isArray(store.runs[uid]) ? store.runs[uid] : [];
-  list.unshift({ id, ts: Date.now(), request, result: slim });
-  store.runs[uid] = list.slice(0, MAX_RUNS_PER_USER);
-  save(store);
-  return id;
-}
-
-export function listRuns(uid: string) {
-  const list = load().runs[uid] ?? [];
-  return list.map((r) => ({
+function summaryOf(r: StoredRun): RunSummary {
+  return {
     id: r.id,
     ts: r.ts,
     topic: r.result.topic,
@@ -72,10 +36,38 @@ export function listRuns(uid: string) {
     durationMs: r.result.durationMs,
     format: r.request.format,
     mode: r.request.mode,
-  }));
+  };
 }
 
-export function getRun(uid: string, id: string): StoredRun | null {
-  const list = load().runs[uid] ?? [];
-  return list.find((r) => r.id === id) ?? null;
+const listKey = (uid: string) => `ie:runs:${hashUid(uid)}`;
+const runKey = (uid: string, id: string) => `ie:run:${hashUid(uid)}:${id}`;
+
+/**
+ * Run history in the shared KV store (Redis on Vercel, local JSON files on
+ * dev): a small per-user summaries key plus one key per full run. Fail-open —
+ * a store error never kills a run (the report is already delivered by then).
+ */
+export async function saveRun(uid: string, request: RunRequest, result: RunResult): Promise<string> {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const slim: RunResult = { ...result, labeled: result.labeled.slice(0, MAX_STORED_LABELED) };
+  const stored: StoredRun = { id, ts: Date.now(), request, result: slim };
+  try {
+    const list = (await storeGetJson<RunSummary[]>(listKey(uid))) ?? [];
+    list.unshift(summaryOf(stored));
+    await storeSetJson(listKey(uid), list.slice(0, MAX_RUNS_PER_USER), RUN_TTL_SECONDS);
+    await storeSetJson(runKey(uid, id), stored, RUN_TTL_SECONDS);
+  } catch {
+    /* store errors must not kill the run */
+  }
+  return id;
+}
+
+export async function listRuns(uid: string): Promise<RunSummary[]> {
+  const list = await storeGetJson<RunSummary[]>(listKey(uid));
+  return Array.isArray(list) ? list : [];
+}
+
+export async function getRun(uid: string, id: string): Promise<StoredRun | null> {
+  const r = await storeGetJson<StoredRun>(runKey(uid, id));
+  return r && typeof r.id === 'string' && r.request && r.result ? r : null;
 }
