@@ -2,6 +2,7 @@ import { EvidenceRecord, Plan, PipelineMode, TimeFrame, SourceId } from '../type
 import { httpText, httpJson, UA, clampDate } from './http';
 import { Provider, withTimeout } from './provider';
 import { dedupe } from './hn';
+import playScraper from 'google-play-scraper';
 
 export const META = { id: 'play' as SourceId, label: 'Play Store Reviews', icon: '\u{1F916}', tagline: 'Star ratings + written reviews for Android apps in the space', keyless: true };
 
@@ -117,7 +118,53 @@ async function htmlScrape(shards: string[], _tf: TimeFrame, _mode: PipelineMode)
   return out;
 }
 
+/**
+ * Primary route: google-play-scraper (maintained library that tracks Google's
+ * internal review API). The two legacy routes below (internal batchexecute
+ * RPC + static page scrape) both broke when Google restructured the Play
+ * web app in late 2026 — kept as fallbacks in case they start working again.
+ */
+async function scraperFetch(shards: string[], tf: TimeFrame, mode: PipelineMode): Promise<EvidenceRecord[]> {
+  const out: EvidenceRecord[] = [];
+  let lastWarn: string | null = null;
+  for (const app of shards) {
+    const pkg = await resolvePackage(app);
+    if (!pkg) { lastWarn = `${app}: not found on Play Store`; continue; }
+    try {
+      const count = mode === 'rapid' ? 40 : 80;
+      const res = await playScraper.reviews({ appId: pkg, num: count, lang: 'en', country: 'us' });
+      let n = 0;
+      for (const r of res.data ?? []) {
+        if (n >= count) break;
+        const date = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
+        if (tf.preset !== 'all' && date) {
+          const days = tf.preset === '7d' ? 7 : tf.preset === '30d' ? 30 : tf.preset === '90d' ? 90 : 365;
+          if (date < new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10)) continue;
+        }
+        out.push({
+          id: `play-scraper-${pkg}-${r.id ?? n}`,
+          source: 'play',
+          title: `${app} review (${r.score ?? '?'}\u2605)`,
+          body: String(r.text ?? '').slice(0, 1000),
+          url: r.url || `https://play.google.com/store/apps/details?id=${pkg}`,
+          author: r.userName ? String(r.userName).slice(0, 60) : app,
+          date: clampDate(date) ?? '',
+          score: (r.score ?? 0) * 10,
+          rating: r.score ? Number(r.score) : undefined,
+        });
+        n++;
+      }
+      if (n === 0) lastWarn = lastWarn ?? `${app}: no reviews in the selected time frame`;
+    } catch (err) {
+      lastWarn = lastWarn ?? `${app}: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+  if (!out.length && lastWarn) throw new Error(lastWarn);
+  return out;
+}
+
 export const PROVIDERS: Provider[] = [
+  { id: 'play-scraper', name: 'Play Store Reviews (google-play-scraper)', timeoutMs: 25_000, fetch: (sh, _p, t, m) => withTimeout(scraperFetch(sh, t, m), 25_000, 'play-scraper').then(dedupe) },
   { id: 'play-batchexecute', name: 'Play Store RPC (batchexecute)', timeoutMs: 25_000, fetch: (sh, _p, t, m) => withTimeout(batchexecute(sh, t, m), 25_000, 'play-batchexecute').then(dedupe) },
   { id: 'play-html', name: 'Play Store page scrape', timeoutMs: 25_000, fetch: (sh, _p, t, m) => withTimeout(htmlScrape(sh, t, m), 25_000, 'play-html').then(dedupe) },
 ];

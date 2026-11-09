@@ -152,6 +152,25 @@ export async function fanOut(
   });
   const results = await Promise.all(tasks);
 
+  // Fallback ladder: the parallel round only covers the first K providers
+  // (K = min(available, shards)) — with a single shard (e.g. one app) the
+  // backup routes never fire. Give the remaining providers a sequential
+  // chance at each failed shard before declaring the source failed.
+  const bench = available.slice(K);
+  const rescues: { p: (typeof available)[number]; ms: number; recs: EvidenceRecord[]; error?: string; shard: string }[] = [];
+  for (let i = 0; i < results.length && bench.length; i++) {
+    if (!results[i].error) continue;
+    const p = bench.shift()!;
+    const shard = groups[i].join(', ');
+    const t0 = Date.now();
+    try {
+      const recs = await withTimeout(p.fetch(groups[i], plan, tf, mode), p.timeoutMs ?? 20_000, p.name);
+      rescues.push({ p, ms: Date.now() - t0, recs, shard });
+    } catch (err) {
+      rescues.push({ p, ms: Date.now() - t0, recs: [] as EvidenceRecord[], error: providerError(err), shard });
+    }
+  }
+
   const attempts: ProviderAttempt[] = [];
   const merged: EvidenceRecord[] = [];
   for (const r of results) {
@@ -164,6 +183,19 @@ export async function fanOut(
       attempts.push({ provider: r.p.id, name: r.p.name, ok: true, records: r.recs.length, ms: r.ms });
       merged.push(...r.recs);
       log(`${def.meta.label}: ✓ ${r.p.name} → ${r.recs.length} records (${r.ms}ms)`, r.recs.length ? 'ok' : 'warn');
+    }
+  }
+
+  for (const r of rescues) {
+    if (r.error) {
+      recordFailure(source, r.p.id, r.error);
+      attempts.push({ provider: r.p.id, name: r.p.name, ok: false, error: r.error, ms: r.ms });
+      log(`${def.meta.label}: ✗ ${r.p.name} (fallback for "${r.shard}") failed (${r.error}, ${r.ms}ms)`, 'warn');
+    } else {
+      recordSuccess(source, r.p.id);
+      attempts.push({ provider: r.p.id, name: r.p.name, ok: true, records: r.recs.length, ms: r.ms });
+      merged.push(...r.recs);
+      log(`${def.meta.label}: ↻ ${r.p.name} rescued shard "${r.shard}" → ${r.recs.length} records (${r.ms}ms)`, 'ok');
     }
   }
 
