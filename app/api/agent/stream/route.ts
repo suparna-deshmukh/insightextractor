@@ -73,13 +73,28 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let lastEventAt = Date.now();
       const send = (e: unknown) => {
+        lastEventAt = Date.now();
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
         } catch {
           /* closed */
         }
       };
+      // Long Gemini/platform calls emit nothing for a while; keep the console
+      // honest with a "still working" log whenever the stream is silent 20s+.
+      const stallTimer = setInterval(() => {
+        const idleMs = Date.now() - lastEventAt;
+        if (idleMs >= 20_000) {
+          lastEventAt = Date.now();
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', text: `⏳ Still working — waiting on Gemini/platform APIs (${Math.round(idleMs / 1000)}s since last step)…`, tone: 'info' })}\n\n`));
+          } catch {
+            /* closed */
+          }
+        }
+      }, 5_000);
       if (error) {
         send({ type: 'error', message: error });
         controller.close();
@@ -100,6 +115,7 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         send({ type: 'error', message: (err as Error).message ?? String(err) });
       } finally {
+        clearInterval(stallTimer);
         controller.close();
       }
     },
