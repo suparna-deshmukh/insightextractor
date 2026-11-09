@@ -674,6 +674,7 @@ export default function Studio() {
                 {phase === 'error' && (
                   <div>
                     <div className="error-box">Run failed: {runErr}</div>
+                    <button className="btn" onClick={() => startRun()}>↻ Retry run</button>
                     <button className="btn" onClick={() => setPhase('wizard')}>← Back to wizard</button>
                   </div>
                 )}

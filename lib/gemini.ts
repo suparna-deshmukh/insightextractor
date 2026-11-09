@@ -177,7 +177,10 @@ async function callModelOnce(
       reasoning_effort: effort,
       ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     }),
-    signal: AbortSignal.timeout(180_000),
+    // Keep per-attempt time tight: on Vercel long-lived serverless requests
+    // get killed (~60-90s), so a stalled model must fail over fast instead
+    // of holding the whole run hostage for three minutes.
+    signal: AbortSignal.timeout(40_000),
   });
   if (res.status === 404) throw new Error('model_missing');
   if (!res.ok) {
