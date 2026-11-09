@@ -154,53 +154,118 @@ function parseReply(buf: Buffer): { value: unknown; rest: Buffer; complete: bool
   return { value: null, rest: buf.subarray(lineEnd + 2), complete: true };
 }
 
+// ---------------- pooled connection (one socket per process) ----------------
+// A fresh TLS handshake from a Vercel instance can cost seconds, so commands
+// share ONE persistent socket: all commands are serialized through a queue,
+// replies parse in the same order, and a timeout/socket error drops the
+// connection (the next command reconnects).
+
+interface QueuedCmd {
+  args: string[] | null; // null = AUTH handshake (reply discarded)
+  resolve: (v: unknown) => void;
+  reject: (e: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+  t0: number;
+  sent?: boolean;
+}
+
+let conn: { socket: net.Socket; buf: Buffer; authed: boolean } | null = null;
+let queue: QueuedCmd[] = [];
+
+function killConn(e: Error) {
+  if (conn) {
+    try { conn.socket.destroy(); } catch { /* noop */ }
+    conn = null;
+  }
+  const pending = queue;
+  queue = [];
+  for (const q of pending) {
+    clearTimeout(q.timer);
+    q.reject(e);
+  }
+}
+
+function pump(): void {
+  if (!conn) return;
+  const { socket } = conn;
+  for (const q of queue) {
+    if (!q.args || q.sent) continue; // AUTH is written at connect time
+    q.sent = true;
+    if (!socket.write(respEncode(q.args))) break; // backpressure; 'drain' resumes
+  }
+}
+
+function connectAndPump(cfg: RedisCfg): void {
+  const socket: net.Socket = cfg.useTls
+    ? (tls.connect({ host: cfg.host, port: cfg.port, servername: cfg.host }) as net.Socket)
+    : (net.connect({ host: cfg.host, port: cfg.port }) as net.Socket);
+  conn = { socket, buf: Buffer.alloc(0), authed: false };
+  socket.on('data', (d) => {
+    if (!conn || conn.socket !== socket) return;
+    conn.buf = Buffer.concat([conn.buf, d]);
+    while (queue.length && conn) {
+      const r = parseReply(conn.buf);
+      if (!r.complete) break;
+      conn.buf = r.rest;
+      const q = queue.shift()!;
+      clearTimeout(q.timer);
+      if (q.args === null) continue; // AUTH reply
+      if (r.value instanceof Error) killConn(r.value);
+      else q.resolve(r.value);
+    }
+  });
+  socket.on('error', (e) => {
+    if (!conn || conn.socket !== socket) return;
+    killConn(e instanceof Error ? e : new Error(String(e)));
+  });
+  socket.on('close', () => {
+    if (!conn || conn.socket !== socket) return;
+    killConn(new Error('redis connection closed'));
+  });
+  socket.on('drain', pump);
+  const start = () => {
+    if (!conn || conn.socket !== socket) return;
+    if (conn.authed) return;
+    if (cfg.auth) socket.write(respEncode(['AUTH', cfg.auth]));
+    conn.authed = true;
+    pump();
+  };
+  socket.on('connect', start);
+  if (socket.readyState === 'open') start();
+}
+
 async function redisCommand(args: string[], timeoutMs = 5000): Promise<unknown> {
   const cfg = parseRedisUrl();
   if (!cfg) throw new Error('INSIGHT_EXTRACTOR_REDIS_URL not set (legacy ASKCARD_REDIS_URL also honored)');
   return new Promise((resolve, reject) => {
-    const socket: net.Socket = cfg.useTls
-      ? (tls.connect({ host: cfg.host, port: cfg.port, servername: cfg.host }) as net.Socket)
-      : (net.connect({ host: cfg.host, port: cfg.port }) as net.Socket);
-    const expected = cfg.auth ? 2 : 1;
-    const replies: unknown[] = [];
-    let buf: Buffer = Buffer.alloc(0);
-    let done = false;
-    const timer = setTimeout(() => fail(new Error(`redis timeout after ${timeoutMs}ms`)), timeoutMs);
-    const fail = (e: Error) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      try { socket.destroy(); } catch { /* noop */ }
-      reject(e);
+    const q: QueuedCmd = {
+      args,
+      resolve,
+      reject,
+      t0: Date.now(),
+      timer: setTimeout(() => killConn(new Error(`redis timeout after ${timeoutMs}ms`)), timeoutMs),
     };
-    socket.on('error', fail);
-    socket.on('data', (d) => {
-      buf = Buffer.concat([buf, d]);
-      while (replies.length < expected) {
-        const r = parseReply(buf);
-        if (!r.complete) break;
-        replies.push(r.value);
-        buf = r.rest;
+    queue.push(q);
+    if (!conn) {
+      if (cfg.auth) {
+        queue.unshift({
+          args: null, resolve: () => {}, reject: () => {}, t0: Date.now(),
+          timer: setTimeout(() => killConn(new Error('redis AUTH timed out')), timeoutMs),
+        });
       }
-      if (replies.length >= expected && !done) {
-        done = true;
-        clearTimeout(timer);
-        if (replies[0] instanceof Error) { socket.end(); reject(replies[0]); return; }
-        const out = replies[expected - 1];
-        socket.end();
-        if (out instanceof Error) reject(out);
-        else resolve(out);
-      }
-    });
-    socket.on('connect', () => {
-      const cmds: string[][] = [];
-      if (cfg.auth) cmds.push(['AUTH', cfg.auth]);
-      cmds.push(args);
-      for (const c of cmds) {
-        if (!socket.write(respEncode(c))) break;
-      }
-    });
+      connectAndPump(cfg);
+    } else if (conn.authed) {
+      pump();
+    }
+    // else: still connecting — start() pumps after AUTH
   });
+}
+
+// Pre-warm: module load happens before the first request on Vercel, so the
+// pooled connection is established while the function boots — real commands
+// then cost one network round-trip, not a TLS handshake.
+if (parseRedisUrl()) {
+  redisCommand(['PING']).catch(() => { /* first real command retries */ });
 }
 
 function warnFallback(e: unknown) {
