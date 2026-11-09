@@ -4,10 +4,13 @@ import { getKey, hydrateStoredKeys } from '@/lib/keys';
 import { geminiUsage, hasGeminiKey } from '@/lib/gemini';
 import { loadHealth } from '@/lib/health';
 import { runWindowFor, clientUid } from '@/lib/usage';
+import { storeBackendName, storePing } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const t0 = Date.now();
+  console.log(`[health] request t+${process.uptime().toFixed(1)}s uptime`);
   await hydrateStoredKeys();
   const health = await loadHealth();
   const sources = SOURCE_LIST.map((s) => {
@@ -37,5 +40,11 @@ export async function GET(req: NextRequest) {
     sources,
     usage: await geminiUsage(),
     runWindow: await runWindowFor(clientUid(req)),
+    store: {
+      backend: storeBackendName(),
+      ...(storeBackendName() === 'redis' ? await storePing() : {}),
+      region: process.env.VERCEL_REGION || 'local',
+      ms: Date.now() - t0,
+    },
   });
 }

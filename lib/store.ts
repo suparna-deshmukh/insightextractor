@@ -311,4 +311,23 @@ export async function storeSetJson(key: string, value: unknown, ttlSeconds?: num
   fileWrite(key, value, ttlSeconds);
 }
 
+/** Which backend serves shared state right now. */
+export function storeBackendName(): 'redis' | 'files' {
+  return parseRedisUrl() ? 'redis' : 'files';
+}
+
+/**
+ * Live probe of the shared backend (PING). Never throws — returns the
+ * outcome, so routes can report it and diagnose connectivity.
+ */
+export async function storePing(timeoutMs = 5000): Promise<{ ok: boolean; ms: number; error?: string }> {
+  const t0 = Date.now();
+  try {
+    const v = await redisCommand(['PING'], timeoutMs);
+    return { ok: v === 'PONG', ms: Date.now() - t0 };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, error: (e as Error).message };
+  }
+}
+
 function now() { return Date.now(); }

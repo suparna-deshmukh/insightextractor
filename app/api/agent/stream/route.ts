@@ -110,13 +110,17 @@ export async function POST(req: NextRequest) {
         controller.close();
         return;
       }
+      const runT0 = Date.now();
+      console.log(`[stream] run start t+${process.uptime().toFixed(1)}s uid=${uid} platforms=${run!.platforms.join(',')} mode=${run!.mode}`);
       await consumeRun(uid);
       send({ type: 'stage', stage: STAGES[0], index: 0, total: STAGES.length });
       send({ type: 'log', text: 'Pipeline started — agent booting.', tone: 'info' });
       try {
         const result = await runPipeline(run!, send);
         await saveRun(uid, run!, result);
+        console.log(`[stream] run done t+${process.uptime().toFixed(1)}s wall=${Date.now() - runT0}ms kept=${result.keptRecords}`);
       } catch (err) {
+        console.error(`[stream] run error t+${process.uptime().toFixed(1)}s wall=${Date.now() - runT0}ms: ${(err as Error).message}`);
         send({ type: 'error', message: (err as Error).message ?? String(err) });
       } finally {
         clearInterval(stallTimer);
