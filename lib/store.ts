@@ -20,11 +20,34 @@ import tls from 'tls';
  */
 
 const LEGACY_DIR = path.join(process.cwd(), '.askcard');
-export const FILE_DIR = path.join(process.cwd(), '.insight-extractor');
+
+/**
+ * Pick a data dir that actually works:
+ * - Vercel/serverless: process.cwd() is read-only, so prefer /tmp (ephemeral,
+ *   but the app tolerates state loss; shared budgets should use Redis there).
+ * - localhost: the project directory, so state survives restarts.
+ */
+function resolveDataDir(): string {
+  const candidates = process.env.VERCEL
+    ? [path.join('/tmp', '.insight-extractor'), path.join(process.cwd(), '.insight-extractor')]
+    : [path.join(process.cwd(), '.insight-extractor'), path.join('/tmp', '.insight-extractor')];
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return candidates[0];
+}
+
+export const FILE_DIR = resolveDataDir();
 
 /**
  * Ensures the data dir exists, migrating the legacy `.askcard/` directory
  * (renamed to `.insight-extractor/`) on first use so local state survives.
+ * Never throws — a read-only filesystem must not take API routes down.
  */
 export function ensureDataDir(): string {
   try {
@@ -32,7 +55,11 @@ export function ensureDataDir(): string {
   } catch {
     /* best effort */
   }
-  fs.mkdirSync(FILE_DIR, { recursive: true });
+  try {
+    fs.mkdirSync(FILE_DIR, { recursive: true });
+  } catch {
+    /* read-only filesystem: run stateless */
+  }
   return FILE_DIR;
 }
 

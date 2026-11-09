@@ -777,6 +777,21 @@ function SettingsModal({ health, onClose, onSaved }: { health: HealthView | null
   const [customName, setCustomName] = useState('');
   const [customValue, setCustomValue] = useState('');
   const [msg, setMsg] = useState('');
+  const [serverKeys, setServerKeys] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        const m: Record<string, string> = {};
+        for (const k of d.keys ?? []) m[k.key] = k.masked;
+        setServerKeys(m);
+      })
+      .catch(() => {});
+  }, []);
+  const setHint = (name: string) =>
+    serverKeys[name] ? (
+      <div className="hint">✓ set server-side: <span style={{ fontFamily: 'var(--mono)' }}>{serverKeys[name]}</span> — leave blank to keep, paste a value to replace.</div>
+    ) : null;
   const usage = health?.usage;
   const save = async () => {
     const body: any = {};
@@ -817,11 +832,11 @@ function SettingsModal({ health, onClose, onSaved }: { health: HealthView | null
             </tbody>
           </table>
         )}
-        <div className="field"><label>Gemini API key #1</label><input type="text" value={g1} onChange={(e) => setG1(e.target.value)} placeholder="AIza…" /></div>
-        <div className="field"><label>Gemini API key #2 (rotates in automatically)</label><input type="text" value={g2} onChange={(e) => setG2(e.target.value)} placeholder="AIza…" /></div>
-        <div className="field"><label>Gemini API key #3 (rotates in automatically)</label><input type="text" value={g3} onChange={(e) => setG3(e.target.value)} placeholder="AIza…" /></div>
-        <div className="field"><label>Product Hunt token (optional)</label><input type="text" value={ph} onChange={(e) => setPh(e.target.value)} placeholder="ph_…" /></div>
-        <div className="field"><label>YouTube Data API key (optional)</label><input type="text" value={yt} onChange={(e) => setYt(e.target.value)} /></div>
+        <div className="field"><label>Gemini API key #1</label><input type="text" value={g1} onChange={(e) => setG1(e.target.value)} placeholder="AIza…" />{setHint('GEMINI_API_KEY')}</div>
+        <div className="field"><label>Gemini API key #2 (rotates in automatically)</label><input type="text" value={g2} onChange={(e) => setG2(e.target.value)} placeholder="AIza…" />{setHint('GEMINI_API_KEY_2')}</div>
+        <div className="field"><label>Gemini API key #3 (rotates in automatically)</label><input type="text" value={g3} onChange={(e) => setG3(e.target.value)} placeholder="AIza…" />{setHint('GEMINI_API_KEY_3')}</div>
+        <div className="field"><label>Product Hunt token (optional)</label><input type="text" value={ph} onChange={(e) => setPh(e.target.value)} placeholder="ph_…" />{setHint('PRODUCTHUNT_API_TOKEN')}</div>
+        <div className="field"><label>YouTube Data API key (optional)</label><input type="text" value={yt} onChange={(e) => setYt(e.target.value)} />{setHint('YOUTUBE_API_KEY')}</div>
         <div className="field">
           <label>Any other API key (optional — name + value, e.g. SERPAPI_KEY)</label>
           <div style={{ display: 'flex', gap: 8 }}>
