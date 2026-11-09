@@ -7,6 +7,38 @@ the signal with LLM + SQL, and hands a product manager a fixed-format **User Ins
 Built for real PMs: problem discovery, product validation, post-launch feedback, competitor
 teardowns, feature prioritization.
 
+## System design
+
+```
+ Studio (browser)                    server (Next.js 15 routes)
+ ┌──────────────────┐   POST /run   ┌────────────────────────────────────────────┐
+ │ topic + brief +  │ ────────────► │ agent loop: Gemini plans source batches →  │
+ │ platform picks   │               │ parallel fetchers (Hacker News, Reddit,    │
+ │ mode (rapid/     │               │ App Store, Play Store, GitHub, Google      │
+ │   standard/      │               │ Trends, Product Hunt, YouTube)             │
+ │   raw-data)      │               │  → clean + dedupe (SQL)                     │
+ └──────────────────┘               │  → LLM bucketing (4 insight buckets)       │
+       ▲                            │  → fixed-format User Insights Report       │
+       │ report + artifacts         └───────────────┬────────────────────────────┘
+                                                    │
+                       lib/store.ts — shared platform state
+                       (Gemini call budget, user identity, run windows)
+                       local: JSON under .insight-extractor/
+                       Vercel: Redis/KV via INSIGHT_EXTRACTOR_REDIS_URL
+```
+
+- **Gemini only**: key pool `GEMINI_API_KEY`, `_2`, `_3` (rotate on quota failure);
+  per-key daily quota (`GEMINI_DAILY_QUOTA`, default 20); model fallback chain
+  `gemini-3.8-flash → 3.6-flash → 3.5-flash → 3.1-flash-lite`; ≤3 Gemini calls per run
+  (rapid = 1, raw-data = 2, standard = 3).
+- **State**: `lib/store.ts` is the only shared-state module — local JSON files on
+  disk (single instance) or Redis (multi-instance). The Gemini budget is enforced
+  platform-wide when a store is configured, never per instance.
+- **Abuse guard**: `RUNS_PER_WINDOW` / `RUN_WINDOW_HOURS` rolling per-user run limit.
+- **Degradation**: store unavailable → app keeps working (in-memory + local files);
+  Google quota error → run completes with remaining sources and an honest health flag.
+- **Vercel**: serverless + Redis; no local FS state is assumed in production.
+
 ## Run it
 
 ```bash
