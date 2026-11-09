@@ -265,6 +265,7 @@ export default function Studio() {
       if (sawError && !gotResult) setPhase('error');
     } catch (err) {
       setRunErr((err as Error).message); setPhase('error');
+      refreshMeta();
     }
   };
 
