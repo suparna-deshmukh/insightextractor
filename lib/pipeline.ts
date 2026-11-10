@@ -2,7 +2,8 @@ import { AgentEvent, Bucket, BucketStats, EvidenceRecord, LabelResult, Plan, Red
 import { SOURCES, fetchPlatform } from './sources';
 import type Database from 'better-sqlite3';
 import { createDb, insertRecords, runQuery, fetchRows } from './sql';
-import { geminiJson, geminiText, hasGeminiKey, geminiConfig, dailyQuota, GeminiAttempt } from './gemini';
+import { geminiJson, geminiText, hasGeminiKey, geminiConfig, dailyQuota, GeminiAttempt, GeminiStepPendingError } from './gemini';
+import { RunState, newState, assembleResult, DONE_STAGE } from './runState';
 import { buildFallbackReport, buildRawCsv, buildRawDataReport } from './report';
 
 export const STAGES = ['Understand & plan', 'Fetch platforms', 'Clean & load (SQL)', 'Bucket & label (LLM+SQL)', 'SQL analysis', 'Synthesize report'];
@@ -20,11 +21,18 @@ const MAX_KEPT = { rapid: 400, deep: 900 } as const;
  * Every stage degrades to a non-LLM fallback if the budget is exhausted,
  * so a run never fails hard on quota and never fabricates data.
  */
-export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void): Promise<RunResult> {
-  const t0 = Date.now();
-  const usedLlm = hasGeminiKey();
-  const model = usedLlm ? geminiConfig().model : 'heuristic-fallback';
-  const audit: SqlAuditEntry[] = [];
+interface StepOpts { oneShot?: boolean }
+
+interface StepCtx {
+  state: RunState;
+  emit: (e: AgentEvent) => void;
+  log: (text: string, tone?: 'info' | 'ok' | 'warn' | 'error') => void;
+  attemptLog: (stage: string) => (a: GeminiAttempt) => void;
+  stage: (index: number) => void;
+  oneShot: boolean;
+}
+
+function makeCtx(state: RunState, emit: (e: AgentEvent) => void, oneShot: boolean): StepCtx {
   const log = (text: string, tone: 'info' | 'ok' | 'warn' | 'error' = 'info') => emit({ type: 'log', text, tone });
 
   /**
@@ -49,18 +57,65 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
     log(`— ${STAGES[index]} —`);
   };
 
-  // ---------- STAGE 1: MASTER PLAN (Gemini call 1/3) ----------
+  return { state, emit, log, attemptLog, stage, oneShot };
+}
+
+/**
+ * Runs ONE pipeline stage against checkpoint state (see lib/runState.ts).
+ *
+ * On success, `state.stage` points at the next stage (or DONE_STAGE) and the
+ * caller persists the state and notifies the client. Returns the final
+ * RunResult when the run completed inside this step (the report stage, or the
+ * clean stage's empty-corpus early exit); otherwise null.
+ *
+ * Throws GeminiStepPendingError (oneShot mode) when a Gemini attempt failed or
+ * stalled: state is left UNCHANGED, so the next request for the same run token
+ * re-runs this same stage — now that the failed model/key is in cooldown.
+ */
+export async function runStep(state: RunState, emit: (e: AgentEvent) => void, opts: StepOpts = {}): Promise<RunResult | null> {
+  const ctx = makeCtx(state, emit, Boolean(opts.oneShot));
+  switch (state.stage) {
+    case 0: await stepPlan(ctx); break;
+    case 1: await stepFetch(ctx); break;
+    case 2: { const early = await stepClean(ctx); if (early) return early; break; }
+    case 3: await stepLabel(ctx); break;
+    case 4: await stepAnalyze(ctx); break;
+    case 5: return await stepReport(ctx);
+    default: return assembleResult(state); // already finished — re-deliver
+  }
+  return null;
+}
+
+/**
+ * Legacy one-shot entry point (local dev / old stream route): runs all six
+ * stages in a single request, no checkpointing. Behaviour is unchanged.
+ */
+export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void): Promise<RunResult> {
+  const usedLlm = hasGeminiKey();
+  const state = newState('inline', req, usedLlm ? geminiConfig().model : 'heuristic-fallback', usedLlm);
+  for (;;) {
+    const result = await runStep(state, emit);
+    if (result) return result;
+    if (state.stage >= DONE_STAGE) return assembleResult(state);
+  }
+}
+
+// ---------- STAGE 1: MASTER PLAN (Gemini call 1/3) ----------
+async function stepPlan(ctx: StepCtx): Promise<void> {
+  const { state, log, attemptLog, stage, oneShot } = ctx;
+  const req = state.request;
   stage(0);
   let plan: Plan;
   let buckets: Bucket[];
-  if (usedLlm) {
+  if (state.usedLlm) {
     log('Gemini call 1/3 — master plan: platform queries + insight buckets + Reddit brief…');
     try {
-      const master = await geminiJson(masterPlanSystem(req), masterPlanUser(req), 4096, 0.2, attemptLog('Gemini 1/3 · master plan'));
+      const master = await geminiJson(masterPlanSystem(req), masterPlanUser(req), 4096, 0.2, attemptLog('Gemini 1/3 · master plan'), oneShot);
       plan = normalizePlan(master, req);
       buckets = parseBuckets(master, req.mode);
       if (!buckets.length) buckets = heuristicBuckets();
     } catch (err) {
+      if (err instanceof GeminiStepPendingError) throw err;
       log(`Master plan failed (${(err as Error).message.slice(0, 140)}) — heuristic plan, saving Gemini budget.`, 'warn');
       plan = heuristicPlan(req);
       buckets = heuristicBuckets();
@@ -75,8 +130,16 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
   if (plan.subreddits.length) log(`Subreddits: ${plan.subreddits.join(', ')}`);
   log(`Buckets: ${buckets.map((b) => `${b.id}:${b.name}`).join('  ')}`);
   log(`Hypotheses: ${plan.hypotheses.slice(0, 2).join(' | ')}`);
+  state.plan = plan;
+  state.buckets = buckets;
+  state.stage = 1;
+}
 
-  // ---------- STAGE 2: FETCH (no LLM) ----------
+// ---------- STAGE 2: FETCH (no LLM) ----------
+async function stepFetch(ctx: StepCtx): Promise<void> {
+  const { state, emit, log, stage } = ctx;
+  const req = state.request;
+  const plan = state.plan!;
   stage(1);
   const selected = req.platforms.filter((p) => SOURCES[p]);
   const perSource = selected.map((s) => ({ source: s, fetched: 0, kept: 0 } as { source: SourceId; fetched: number; kept: number; provider?: string; warning?: string }));
@@ -109,38 +172,67 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
     emit({ type: 'source', source: stat.source, fetched: stat.fetched, kept: stat.fetched, warning: stat.warning });
   });
   log(`Total raw records: ${allRecords.length}`, allRecords.length ? 'ok' : 'warn');
+  state.perSource = perSource;
+  state.totalRecords = allRecords.length;
+  state.redditAudit = redditAudit;
+  state.raw = allRecords;
+  state.stage = 2;
+}
 
-  // ---------- STAGE 3: CLEAN & LOAD (SQL, no LLM) ----------
+// ---------- STAGE 3: CLEAN & LOAD (SQL, no LLM) ----------
+async function stepClean(ctx: StepCtx): Promise<RunResult | null> {
+  const { state, emit, log, stage } = ctx;
+  const req = state.request;
+  const plan = state.plan!;
   stage(2);
+  const all = state.raw ?? [];
+  state.raw = undefined; // only this stage needs the raw corpus
   const db = createDb();
-  const relevance = relevanceFilter(allRecords, plan, req);
+  const relevance = relevanceFilter(all, plan, req);
   log(`Relevance pre-filter: kept ${relevance.kept.length} / ${relevance.all.length} records (dropped ${relevance.all.length - relevance.kept.length} off-topic)`, relevance.all.length - relevance.kept.length ? 'warn' : 'ok');
   const kept = relevance.kept.slice(0, MAX_KEPT[req.mode]);
   insertRecords(db, kept);
-  runQuery(db, audit, 'clean', 'SELECT COUNT(*) AS n FROM records', (r) => `${r[0].n} records loaded into SQLite (in-memory)`);
-  const perSourceKept = runQuery(db, audit, 'clean', 'SELECT source, COUNT(*) AS n FROM records GROUP BY source ORDER BY n DESC', (r) => r.map((x) => `${x.source}:${x.n}`).join(' '));
-  for (const stat of perSource) stat.kept = perSourceKept.find((x) => x.source === stat.source)?.n ?? 0;
-  if (kept.length < allRecords.length) log(`Truncated to ${kept.length} records (mode=${req.mode})`, 'info');
+  runQuery(db, state.audit, 'clean', 'SELECT COUNT(*) AS n FROM records', (r) => `${r[0].n} records loaded into SQLite (in-memory)`);
+  const perSourceKept = runQuery(db, state.audit, 'clean', 'SELECT source, COUNT(*) AS n FROM records GROUP BY source ORDER BY n DESC', (r) => r.map((x) => `${x.source}:${x.n}`).join(' '));
+  for (const stat of state.perSource ?? []) stat.kept = perSourceKept.find((x) => x.source === stat.source)?.n ?? 0;
+  if (kept.length < all.length) log(`Truncated to ${kept.length} records (mode=${req.mode})`, 'info');
+  state.kept = kept;
+  state.keptRecords = kept.length;
 
   if (!kept.length) {
     const report = cleanReport(buildFallbackReport(req, plan, [], 'No records could be fetched from the selected platforms in this window. Widen the timeframe or add more platforms, then re-run.'));
-    const early: RunResult = {
-      topic: req.topic, description: req.description, objective: req.objective, timeframe: req.timeframes.default,
-      plan, totalRecords: allRecords.length, keptRecords: 0, irrelevantDropped: allRecords.length, perSource, buckets: [], trend: [],
-      labeled: [], sqlAudit: audit, report, model, usedLlm, durationMs: Date.now() - t0, rawCsv: '',
-    };
+    state.report = report;
+    state.buckets = [];
+    state.trend = [];
+    state.labeled = [];
+    state.rawCsv = '';
+    state.irrelevant = all.length;
+    state.stage = DONE_STAGE;
+    const early = assembleResult(state);
     emit({ type: 'result', result: early });
     return early;
   }
 
-  // ---------- STAGE 4: BUCKET & LABEL (Gemini call 2/3 — whole corpus, one call) ----------
+  state.stage = 3;
+  return null;
+}
+
+// ---------- STAGE 4: BUCKET & LABEL (Gemini call 2/3 — whole corpus, one call) ----------
+async function stepLabel(ctx: StepCtx): Promise<void> {
+  const { state, log, attemptLog, stage, oneShot } = ctx;
+  const req = state.request;
+  const plan = state.plan!;
+  const buckets = state.buckets!;
   stage(3);
+  const db = createDb();
+  insertRecords(db, state.kept ?? []);
   let labels: Map<string, LabelResult>;
-  if (usedLlm) {
-    log(`Gemini call 2/3 — labeling all ${Math.min(kept.length, MAX_KEPT[req.mode])} records in a single pass…`);
+  if (state.usedLlm) {
+    log(`Gemini call 2/3 — labeling all ${Math.min((state.kept ?? []).length, MAX_KEPT[req.mode])} records in a single pass…`);
     try {
-      labels = await labelCorpus(db, audit, buckets, plan, req, log, attemptLog('Gemini 2/3 · label corpus'));
+      labels = await labelCorpus(db, state.audit, buckets, plan, req, log, attemptLog('Gemini 2/3 · label corpus'), oneShot);
     } catch (err) {
+      if (err instanceof GeminiStepPendingError) throw err;
       log(`LLM labeling failed (${(err as Error).message.slice(0, 140)}) — rule-based labels, saving Gemini budget.`, 'warn');
       labels = heuristicLabels(db, buckets);
     }
@@ -149,15 +241,25 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
     log('Heuristic bucketing (no LLM): rule-based assignment.', 'warn');
   }
   applyLabels(db, labels);
-  const relCounts = runQuery(db, audit, 'bucket', "SELECT relevance, COUNT(*) AS n FROM records GROUP BY relevance", (r) => r.map((x) => `${x.relevance}:${x.n}`).join(' '));
+  const relCounts = runQuery(db, state.audit, 'bucket', "SELECT relevance, COUNT(*) AS n FROM records GROUP BY relevance", (r) => r.map((x) => `${x.relevance}:${x.n}`).join(' '));
   const irrelevant = (relCounts.find((x) => x.relevance === 'irrelevant') as any)?.n ?? 0;
-  runQuery(db, audit, 'bucket', "SELECT COUNT(*) AS n FROM records WHERE bucket IS NOT NULL AND relevance='relevant'", (r) => `${r[0].n} relevant records bucketed`);
+  runQuery(db, state.audit, 'bucket', "SELECT COUNT(*) AS n FROM records WHERE bucket IS NOT NULL AND relevance='relevant'", (r) => `${r[0].n} relevant records bucketed`);
   log(`Relevance check: ${irrelevant} records marked irrelevant → excluded from insights`, irrelevant ? 'warn' : 'ok');
+  state.labels = Object.fromEntries(labels);
+  state.irrelevant = irrelevant;
+  state.stage = 4;
+}
 
-  // ---------- STAGE 5: SQL ANALYSIS (no LLM) ----------
+// ---------- STAGE 5: SQL ANALYSIS (no LLM) ----------
+async function stepAnalyze(ctx: StepCtx): Promise<void> {
+  const { state, log, stage } = ctx;
+  const buckets = state.buckets!;
   stage(4);
+  const db = createDb();
+  insertRecords(db, state.kept ?? []);
+  if (state.labels) applyLabels(db, new Map(Object.entries(state.labels)));
   const bucketStats: BucketStats[] = buckets.map((b) => {
-    const agg = runQuery(db, audit, 'analyze',
+    const agg = runQuery(db, state.audit, 'analyze',
       `SELECT COUNT(*) AS n, ROUND(AVG(score),1) AS avg_score,
          SUM(CASE WHEN sentiment='positive' THEN 1 ELSE 0 END) AS pos,
          SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS neg,
@@ -175,28 +277,43 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
       topQuotes: quotes.map(rowToRecord),
     };
   });
-  const total = kept.length;
+  const total = state.kept?.length ?? 0;
   for (const b of bucketStats) b.share = total ? Math.round((b.count / total) * 1000) / 10 : 0;
   bucketStats.sort((a, b) => b.count - a.count);
 
-  const trend = runQuery(db, audit, 'analyze', "SELECT date, COUNT(*) AS n FROM records WHERE date != '' GROUP BY date ORDER BY date", (r) => `${r.length} active days`);
-  runQuery(db, audit, 'analyze', "SELECT source, ROUND(AVG(score),1) AS avg, COUNT(*) AS n FROM records GROUP BY source ORDER BY n DESC", (r) => r.map((x) => `${x.source} avg=${x.avg}`).join(' '));
-  log(`SQL analysis complete — ${audit.length} queries audited.`, 'ok');
+  const trend = runQuery(db, state.audit, 'analyze', "SELECT date, COUNT(*) AS n FROM records WHERE date != '' GROUP BY date ORDER BY date", (r) => `${r.length} active days`);
+  runQuery(db, state.audit, 'analyze', "SELECT source, ROUND(AVG(score),1) AS avg, COUNT(*) AS n FROM records GROUP BY source ORDER BY n DESC", (r) => r.map((x) => `${x.source} avg=${x.avg}`).join(' '));
+  log(`SQL analysis complete — ${state.audit.length} queries audited.`, 'ok');
+  state.bucketStats = bucketStats;
+  state.trend = (trend as any[]).map((t) => ({ date: t.date, count: t.n }));
+  state.stage = 5;
+}
 
-  // ---------- STAGE 6: SYNTHESIZE (Gemini call 3/3 — skipped for Raw Data) ----------
+// ---------- STAGE 6: SYNTHESIZE (Gemini call 3/3 — skipped for Raw Data) ----------
+async function stepReport(ctx: StepCtx): Promise<RunResult> {
+  const { state, log, attemptLog, stage, oneShot } = ctx;
+  const req = state.request;
+  const plan = state.plan!;
+  const buckets = state.buckets ?? [];
+  const bucketStats = state.bucketStats ?? [];
+  const trend = state.trend ?? [];
   stage(5);
+  const db = createDb();
+  insertRecords(db, state.kept ?? []);
+  if (state.labels) applyLabels(db, new Map(Object.entries(state.labels)));
   let report: string;
   let rawCsv = '';
   if (req.format === 'raw-data') {
     const rel = (fetchRows(db, "SELECT * FROM records WHERE relevance='relevant' ORDER BY bucket, score DESC") as any[]).map((r) => ({ ...rowToRecord(r), bucket: Number(r.bucket), sentiment: r.sentiment ?? 'neutral' }));
     rawCsv = buildRawCsv(rel, (id) => buckets.find((b) => b.id === id)?.name ?? `#${id}`);
-    report = buildRawDataReport(req, plan, rel.length, kept.length, allRecords.length, redditAudit);
+    report = buildRawDataReport(req, plan, rel.length, state.kept?.length ?? 0, state.totalRecords ?? 0, state.redditAudit ?? null);
     log(`Raw Data output: CSV with ${rel.length} relevant insights — report synthesis call skipped (run used 2 of the 3-call budget).`, 'ok');
-  } else if (usedLlm) {
+  } else if (state.usedLlm) {
     log('Gemini call 3/3 — synthesizing the final User Insights report…');
     try {
-      report = await synthesizeReport(req, plan, bucketStats, trend, model, redditAudit, attemptLog('Gemini 3/3 · report'));
+      report = await synthesizeReport(req, plan, bucketStats, trend as any[], state.model, state.redditAudit ?? null, attemptLog('Gemini 3/3 · report'), oneShot);
     } catch (err) {
+      if (err instanceof GeminiStepPendingError) throw err;
       log(`Report synthesis failed (${(err as Error).message.slice(0, 140)}) — template report, saving Gemini budget.`, 'warn');
       report = cleanReport(buildFallbackReport(req, plan, bucketStats, 'LLM report synthesis unavailable in this run (quota); this is the deterministic template. Re-run when quota is available.'));
     }
@@ -206,15 +323,11 @@ export async function runPipeline(req: RunRequest, emit: (e: AgentEvent) => void
   log('Report ready.', 'ok');
 
   const labeled = fetchRows(db, 'SELECT * FROM records WHERE bucket IS NOT NULL ORDER BY relevance DESC, score DESC').map((r) => ({ ...rowToRecord(r), bucket: r.bucket, sentiment: r.sentiment ?? 'neutral', relevance: r.relevance ?? 'relevant' })).slice(0, 500);
-
-  const result: RunResult = {
-    topic: req.topic, description: req.description, objective: req.objective, timeframe: req.timeframes.default,
-    plan, totalRecords: allRecords.length, keptRecords: kept.length, irrelevantDropped: irrelevant, perSource, buckets: bucketStats,
-    trend: (trend as any[]).map((t) => ({ date: t.date, count: t.n })),
-    labeled, rawCsv, sqlAudit: audit, report, model, usedLlm, durationMs: Date.now() - t0,
-  };
-  emit({ type: 'result', result });
-  return result;
+  state.report = report;
+  state.rawCsv = rawCsv;
+  state.labeled = labeled;
+  state.stage = DONE_STAGE;
+  return assembleResult(state);
 }
 
 // ---------------- master plan (Gemini call 1/3) ----------------
@@ -260,7 +373,7 @@ function parseBuckets(master: any, mode: RunRequest['mode']): Bucket[] {
 
 // ---------------- labeling (Gemini call 2/3 — the whole corpus in ONE call) ----------------
 
-async function labelCorpus(db: Database.Database, audit: SqlAuditEntry[], buckets: Bucket[], plan: Plan, req: RunRequest, log: (t: string, t2?: any) => void, onAttempt: (a: GeminiAttempt) => void): Promise<Map<string, LabelResult>> {
+async function labelCorpus(db: Database.Database, audit: SqlAuditEntry[], buckets: Bucket[], plan: Plan, req: RunRequest, log: (t: string, t2?: any) => void, onAttempt: (a: GeminiAttempt) => void, oneShot = false): Promise<Map<string, LabelResult>> {
   const out = new Map<string, LabelResult>();
   const all: any[] = fetchRows(db, 'SELECT id, substr(title,1,120) AS title, substr(body,1,200) AS body, source FROM records');
   const cap = MAX_KEPT[req.mode];
@@ -271,7 +384,8 @@ async function labelCorpus(db: Database.Database, audit: SqlAuditEntry[], bucket
     `Buckets: ${bucketList}\nTopic: ${req.topic}\nWhat we are looking for: ${plan.lookFor.join('; ')}\nRecords (${rows.length}):\n${rows.map((r) => `${r.id} | ${r.source} | ${r.title} | ${r.body}`).join('\n')}`,
     req.mode === 'rapid' ? 24576 : 32768,
     0.1,
-    onAttempt
+    onAttempt,
+    oneShot
   );
   const arr: any[] = Array.isArray(data) ? data : data.labels;
   for (const l of arr) {
@@ -295,7 +409,7 @@ function applyLabels(db: Database.Database, labels: Map<string, LabelResult>): v
 
 // ---------------- report synthesis (Gemini call 3/3) ----------------
 
-async function synthesizeReport(req: RunRequest, plan: Plan, bucketStats: BucketStats[], trend: any[], model: string, redditAudit: RedditAudit | null, onAttempt: (a: GeminiAttempt) => void): Promise<string> {
+async function synthesizeReport(req: RunRequest, plan: Plan, bucketStats: BucketStats[], trend: any[], model: string, redditAudit: RedditAudit | null, onAttempt: (a: GeminiAttempt) => void, oneShot = false): Promise<string> {
   const ctx = {
     topic: req.topic,
     description: req.description,
@@ -349,7 +463,8 @@ async function synthesizeReport(req: RunRequest, plan: Plan, bucketStats: Bucket
     `Produce the USER INSIGHTS REPORT for "${req.topic}".\n${fmtNote}\n${lenNote}\n${toneNote}\n${cmpNote}\n${redditNote}\n\nEVIDENCE (JSON):\n${JSON.stringify(ctx, null, 1)}\n\nREQUIRED STRUCTURE (markdown, section numbers as given):\n# USER INSIGHTS REPORT — ${req.topic.toUpperCase()}\n## 1. SNAPSHOT (bullets: records analyzed, platforms, timeframe, objective, industry and audience if given, signal strength = strong >=300 / moderate >=80 / thin <80)\n## 2. TOP INSIGHT BUCKETS (markdown table: Bucket | n | Share | Avg score | Sentiment mix | Strongest platforms)\n## 3. WHAT USERS LOVE (bullets, each citing count)\n## 4. WHAT USERS HATE (bullets ordered by severity, each citing count)\n## 5. UNMET NEEDS & FEATURE REQUESTS (bullets, ranked by frequency)\n## 6. VOICE OF THE USER (for the top 3 buckets, 1-2 short verbatim quotes with [platform, date] attribution)\n## 7. MOMENTUM & TRENDS (weekly direction from trend data; if thin, say so)\n## 8. RECOMMENDATIONS (3-5, format: **P1/P2/P3 — action** — rationale (evidence: bucket, n records))\n## 9. METHOD & DATA APPENDIX (sources + API providers used, relevance filtering approach, bucketing approach = LLM-defined buckets + SQL aggregation, limitations)\n\nJSON context:\n`,
     req.reportLength === 'concise' ? 4096 : req.reportLength === 'detailed' ? 12288 : 8192,
     0.35,
-    onAttempt
+    onAttempt,
+    oneShot
   );
   return cleanReport(report);
 }

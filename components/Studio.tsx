@@ -238,47 +238,97 @@ export default function Studio() {
     };
     addLog(`Agent booting — ${req.platforms.length} platforms, ${describeTf(tfPreset, tfStart, tfEnd)}, ${MODES.find((m) => m.id === mode)?.t}.`, 'stage');
     addLog('Gemini budget for this run: ≤3 calls (master plan → label corpus → report).', 'info');
+    // Step-driven runs: each POST executes exactly ONE pipeline stage. The
+    // server checkpoints progress in Redis under runToken; if a connection
+    // drops (Vercel instance kill) we simply POST again and the run resumes
+    // from the last checkpoint — a dead connection costs at most one stage.
+    const MAX_DROPS = 3;
+    const MAX_RETRIES = 6;
+    let drops = 0;
+    let retries = 0;
+    let lastStage = -1;
+    let stopped = false;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     try {
-      const res = await fetch('/api/agent/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-insight-extractor-user': uid.current },
-        body: JSON.stringify({ ...req, runToken }),
-      });
-      if (!res.ok || !res.body) { setRunErr(`Server error ${res.status}`); setPhase('error'); return; }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      let gotResult = false;
-      let sawError = false;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let idx: number;
-        while ((idx = buf.indexOf('\n\n')) >= 0) {
-          const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
-          for (const line of chunk.split('\n')) {
-            if (!line.startsWith('data: ')) continue;
-            let e: any; try { e = JSON.parse(line.slice(6)); } catch { continue; }
-            if (e.type === 'stage') { setStageIdx(e.index); addLog(`▸ ${e.stage}`, 'stage'); }
-            else if (e.type === 'log') addLog(e.text, e.tone ?? 'info');
-            else if (e.type === 'source') setLive((l) => ({ ...l, [e.source]: { fetched: e.fetched, warning: e.warning, done: true } }));
-            else if (e.type === 'result') { gotResult = true; setResult(e.result); setPhase('done'); addLog(`Done in ${(e.result.durationMs / 1000).toFixed(1)}s — ${e.result.keptRecords} records across ${e.result.perSource.length} platforms.`, 'ok'); }
-            else if (e.type === 'error') { sawError = true; setRunErr(e.message); addLog(`ERROR: ${e.message}`, 'error'); }
+      for (;;) {
+        let gotResult = false;
+        let sawError = false;
+        let hardFail: string | null = null;
+        try {
+          const res = await fetch('/api/agent/step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-insight-extractor-user': uid.current },
+            body: JSON.stringify({ ...req, runToken }),
+          });
+          if (!res.ok || !res.body) {
+            hardFail = `Server error ${res.status}`;
+          } else {
+            const reader = res.body.getReader();
+            const dec = new TextDecoder();
+            let buf = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += dec.decode(value, { stream: true });
+              let idx: number;
+              while ((idx = buf.indexOf('\n\n')) >= 0) {
+                const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+                for (const line of chunk.split('\n')) {
+                  if (!line.startsWith('data: ')) continue;
+                  let e: any; try { e = JSON.parse(line.slice(6)); } catch { continue; }
+                  if (e.type === 'stage') {
+                    if (typeof e.index === 'number' && e.index > lastStage) { lastStage = e.index; drops = 0; retries = 0; }
+                    setStageIdx(e.index); addLog(`▸ ${e.stage}`, 'stage');
+                  }
+                  else if (e.type === 'log') addLog(e.text, e.tone ?? 'info');
+                  else if (e.type === 'source') setLive((l) => ({ ...l, [e.source]: { fetched: e.fetched, warning: e.warning, done: true } }));
+                  else if (e.type === 'step_done') {
+                    if (typeof e.stage === 'number' && e.stage > lastStage) { lastStage = e.stage; drops = 0; retries = 0; }
+                    addLog('Checkpoint saved — next stage starting…', 'info');
+                  }
+                  else if (e.type === 'step_retry') {
+                    retries += 1;
+                    if (retries > MAX_RETRIES) {
+                      setRunErr('The model kept failing across retries — your slot was refunded. Press Retry to re-run (settings are kept).');
+                      addLog('ERROR: too many model retries in one step.', 'error');
+                      setPhase('error'); refundSlot(); stopped = true;
+                    } else {
+                      addLog(`Model hiccup — this step will retry on its own (${retries}/${MAX_RETRIES})…`, 'warn');
+                    }
+                  }
+                  else if (e.type === 'result') { gotResult = true; setResult(e.result); setPhase('done'); addLog(`Done in ${(e.result.durationMs / 1000).toFixed(1)}s — ${e.result.keptRecords} records across ${e.result.perSource.length} platforms.`, 'ok'); }
+                  else if (e.type === 'error') { sawError = true; setRunErr(e.message); addLog(`ERROR: ${e.message}`, 'error'); }
+                }
+                if (stopped) break;
+              }
+              if (stopped) break;
+            }
+          }
+        } catch (err) {
+          drops += 1;
+          if (drops >= MAX_DROPS) {
+            setRunErr(`Connection dropped mid-run (${(err as Error).message || 'network error'}). Your slot was refunded — press Retry to re-run (settings are kept).`);
+            setPhase('error');
+            refundSlot();
+            stopped = true;
+          } else {
+            addLog(`Connection dropped — resuming the run from its checkpoint (${drops}/${MAX_DROPS})…`, 'warn');
           }
         }
+        if (stopped) break;
+        if (gotResult || sawError || hardFail) {
+          if (hardFail) {
+            setRunErr(`${hardFail} — your slot was refunded. Press Retry to re-run (settings are kept).`);
+            setPhase('error');
+            refundSlot();
+          }
+          break;
+        }
+        // Stream closed without a result: the next POST continues from the
+        // last checkpoint (the server is idempotent per run token).
+        await sleep(1500);
       }
-      refreshMeta();
-      if (!gotResult && !sawError) {
-        setRunErr('Connection dropped before the run finished. Your slot was refunded — press Retry to re-run (settings are kept).');
-        setPhase('error');
-        refundSlot();
-      }
-      if (sawError && !gotResult) setPhase('error');
-    } catch (err) {
-      setRunErr(`Connection dropped mid-run (${(err as Error).message || 'network error'}). Your slot was refunded — press Retry to re-run (settings are kept).`);
-      setPhase('error');
-      refundSlot();
+    } finally {
       refreshMeta();
     }
   };

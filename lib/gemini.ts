@@ -12,6 +12,18 @@ export class RetryableError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
+/**
+ * Raised in step-driven (oneShot) mode when a Gemini attempt fails or stalls:
+ * the current stage is NOT retried inside the same request — the request ends
+ * after a single ~40s attempt, the stage is checkpointed as "pending", and the
+ * NEXT request (same run token) retries the stage with the failed model/key
+ * already in cooldown. This keeps every step request short enough to survive
+ * Vercel's instance kills.
+ */
+export class GeminiStepPendingError extends Error {
+  constructor(detail: string) { super(detail); this.name = 'GeminiStepPendingError'; }
+}
+
 // ---------------- key pool (GEMINI_API_KEY, GEMINI_API_KEY_2, _3, …) ----------------
 
 const KEY_NAME_RE = /^GEMINI_API_KEY(_\d+)?$/;
@@ -226,6 +238,8 @@ interface DispatchOpts {
   temperature: number;
   effort: 'low' | 'medium';
   jsonMode: boolean;
+  /** One request, one attempt: fail fast and let the step layer retry. */
+  oneShot?: boolean;
 }
 
 /**
@@ -265,21 +279,29 @@ async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string
       try {
         const text = await callModelOnce(model, n, o.system, o.user, o.maxTokens, o.temperature, o.effort, o.jsonMode);
         await bumpUsage(n);
+        onAttempt?.({ model, key: n, outcome: 'ok' });
         return text;
       } catch (err) {
         const e = err as Error;
         errs.push(`[${model}/${n}] ${e.message.slice(0, 140)}`);
         if (e.message === 'model_missing') {
+          onAttempt?.({ model, key: n, outcome: 'model-missing', detail: 'model not found (404)' });
           deadModels.add(model); // model is gone everywhere — next model, same key
           continue;
         }
         if (isQuotaError(e)) {
+          onAttempt?.({ model, key: n, outcome: 'quota', detail: e.message.slice(0, 200) });
           await markExhausted(n); // record QUOTA/QUOTA + refuse until 00:00 UTC
           quotaHit = true;
           break; // instantly on to the next key
         }
+        onAttempt?.({ model, key: n, outcome: 'error', detail: e.message.slice(0, 200) });
         if (e.message !== 'model_missing') await markModelUnwell(model);
         await bumpUsage(n); // transient error: the request was sent — it counts
+        if (o.oneShot) {
+          await markUnwell(n);
+          throw new GeminiStepPendingError(`single-attempt mode — ${e.message.slice(0, 160)}`);
+        }
         await sleep(900);
         continue; // model hiccup → try the next model on the SAME key
       }
@@ -294,8 +316,8 @@ async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string
   throw new Error(`Gemini unavailable after failover: ${errs.slice(-2).join(' | ')}`);
 }
 
-export async function geminiText(system: string, user: string, maxTokens = 4096, temperature = 0.4, onAttempt?: AttemptLog): Promise<string> {
-  return dispatch({ system, user, maxTokens, temperature, effort: 'low', jsonMode: false }, onAttempt);
+export async function geminiText(system: string, user: string, maxTokens = 4096, temperature = 0.4, onAttempt?: AttemptLog, oneShot = false): Promise<string> {
+  return dispatch({ system, user, maxTokens, temperature, effort: 'low', jsonMode: false, oneShot }, onAttempt);
 }
 
 function closeTruncated(t: string): string {
@@ -344,7 +366,7 @@ export function extractJson(text: string): any {
   throw new Error('Could not parse JSON from LLM output');
 }
 
-export async function geminiJson(system: string, user: string, maxTokens = 16384, temperature = 0.2, onAttempt?: AttemptLog): Promise<any> {
-  const out = await dispatch({ system, user, maxTokens, temperature, effort: 'low', jsonMode: true }, onAttempt);
+export async function geminiJson(system: string, user: string, maxTokens = 16384, temperature = 0.2, onAttempt?: AttemptLog, oneShot = false): Promise<any> {
+  const out = await dispatch({ system, user, maxTokens, temperature, effort: 'low', jsonMode: true, oneShot }, onAttempt);
   return extractJson(out);
 }
