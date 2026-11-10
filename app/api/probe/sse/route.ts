@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import net from 'net';
+import tls from 'tls';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -27,10 +29,30 @@ export async function GET(req: NextRequest) {
         }).then((r) => { fetchDone = `http ${r.status}`; }).catch((e) => { fetchDone = `err: ${(e as Error).message}`; });
       }
       if (mode === 'slowfetch') {
-        const t = Date.now();
-        fetch('https://httpbin.org/delay/90', { signal: AbortSignal.timeout(150_000) })
-          .then((r) => { fetchDone = `http ${r.status} after ${Date.now() - t}ms`; })
-          .catch((e) => { fetchDone = `err: ${(e as Error).message} after ${Date.now() - t}ms`; });
+        // Hold a raw TCP+TLS socket to the Upstash DB (no commands) — a
+        // pending outbound connection that never resolves.
+        const rawT0 = Date.now();
+        const urlRaw = (process.env.INSIGHT_EXTRACTOR_REDIS_URL || '').trim();
+        let rawDone: string | null = null;
+        if (urlRaw) {
+          const u = new URL(urlRaw);
+          const s = tls.connect({ host: u.hostname, port: Number(u.port) || 6379, servername: u.hostname });
+          s.on('secureConnect', () => { send({ type: 'log', text: `raw socket established at t+${Date.now() - rawT0}ms`, tone: 'info' }); });
+          s.on('error', (e) => { rawDone = `raw err: ${(e as Error).message} at t+${Date.now() - rawT0}ms`; send({ type: 'log', text: rawDone, tone: 'warn' }); });
+          s.on('close', () => { if (!rawDone) { rawDone = `raw closed at t+${Date.now() - rawT0}ms`; send({ type: 'log', text: rawDone, tone: 'warn' }); } });
+          setTimeout(() => { if (!rawDone) { s.destroy(); rawDone = `raw destroyed (timeout) at t+${Date.now() - rawT0}ms`; } }, seconds * 1000);
+        } else {
+          rawDone = 'raw: no redis url';
+        }
+        const rt = Date.now();
+        fetch('https://httpbingo.org/delay/90', { signal: AbortSignal.timeout(140_000) })
+          .then(async (r) => { fetchDone = `http ${r.status} after ${Date.now() - rt}ms`; })
+          .catch((e) => { fetchDone = `err: ${(e as Error).message} after ${Date.now() - rt}ms`; });
+        setInterval(() => {
+          if (rawDone || fetchDone) {
+            send({ type: 'log', text: `pending status: fetch=${fetchDone} raw=${rawDone}`, tone: 'info' });
+          }
+        }, 30_000);
       }
       const iv = setInterval(() => {
         send({ type: 'log', text: `tick t+${Date.now() - t0}ms uptime=${process.uptime().toFixed(1)}s fetch=${fetchDone}`, tone: 'info' });
