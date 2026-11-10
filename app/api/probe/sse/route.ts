@@ -26,6 +26,12 @@ export async function GET(req: NextRequest) {
           signal: AbortSignal.timeout(seconds * 1000),
         }).then((r) => { fetchDone = `http ${r.status}`; }).catch((e) => { fetchDone = `err: ${(e as Error).message}`; });
       }
+      if (mode === 'slowfetch') {
+        const t = Date.now();
+        fetch('https://httpbin.org/delay/90', { signal: AbortSignal.timeout(150_000) })
+          .then((r) => { fetchDone = `http ${r.status} after ${Date.now() - t}ms`; })
+          .catch((e) => { fetchDone = `err: ${(e as Error).message} after ${Date.now() - t}ms`; });
+      }
       const iv = setInterval(() => {
         send({ type: 'log', text: `tick t+${Date.now() - t0}ms uptime=${process.uptime().toFixed(1)}s fetch=${fetchDone}`, tone: 'info' });
       }, 5000);
