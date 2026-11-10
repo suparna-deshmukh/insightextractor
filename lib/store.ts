@@ -376,6 +376,33 @@ export async function storeSetJson(key: string, value: unknown, ttlSeconds?: num
   fileWrite(key, value, ttlSeconds);
 }
 
+/** Raw string read. Null on missing/expired. */
+export async function storeGet(key: string): Promise<string | null> {
+  if (parseRedisUrl()) {
+    try {
+      const v = await redisCommand(['GET', key]);
+      return typeof v === 'string' ? v : null;
+    } catch (e) { warnFallback(e); }
+  }
+  const d = fileRead(key);
+  return d ? String(d.v) : null;
+}
+
+/** Delete a key (Redis DEL or local file unlink). */
+export async function storeDel(key: string): Promise<void> {
+  if (parseRedisUrl()) {
+    try {
+      await redisCommand(['DEL', key]);
+      return;
+    } catch (e) { warnFallback(e); }
+  }
+  try {
+    ensureDataDir();
+    const p = path.join(FILE_DIR, `${key}.json`);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  } catch { /* ephemeral */ }
+}
+
 /** Which backend serves shared state right now. */
 export function storeBackendName(): 'redis' | 'files' {
   return parseRedisUrl() ? 'redis' : 'files';

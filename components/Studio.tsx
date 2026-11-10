@@ -228,13 +228,21 @@ export default function Studio() {
   const startRun = async () => {
     setPhase('running'); setLogs([]); setLive({}); setStageIdx(0); setResult(null); setRunErr(''); setTab('report'); setLoadedReq(null);
     const req = buildRequest();
+    const runToken = 'rt_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    const refundSlot = () => {
+      fetch('/api/agent/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-insight-extractor-user': uid.current },
+        body: JSON.stringify({ token: runToken }),
+      }).catch(() => {});
+    };
     addLog(`Agent booting — ${req.platforms.length} platforms, ${describeTf(tfPreset, tfStart, tfEnd)}, ${MODES.find((m) => m.id === mode)?.t}.`, 'stage');
     addLog('Gemini budget for this run: ≤3 calls (master plan → label corpus → report).', 'info');
     try {
       const res = await fetch('/api/agent/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-insight-extractor-user': uid.current },
-        body: JSON.stringify(req),
+        body: JSON.stringify({ ...req, runToken }),
       });
       if (!res.ok || !res.body) { setRunErr(`Server error ${res.status}`); setPhase('error'); return; }
       const reader = res.body.getReader();
@@ -261,10 +269,16 @@ export default function Studio() {
         }
       }
       refreshMeta();
-      if (!gotResult && !sawError) { setRunErr('Stream ended without a result.'); setPhase('error'); }
+      if (!gotResult && !sawError) {
+        setRunErr('Connection dropped before the run finished. Your slot was refunded — press Retry to re-run (settings are kept).');
+        setPhase('error');
+        refundSlot();
+      }
       if (sawError && !gotResult) setPhase('error');
     } catch (err) {
-      setRunErr((err as Error).message); setPhase('error');
+      setRunErr(`Connection dropped mid-run (${(err as Error).message || 'network error'}). Your slot was refunded — press Retry to re-run (settings are kept).`);
+      setPhase('error');
+      refundSlot();
       refreshMeta();
     }
   };

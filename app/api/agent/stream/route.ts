@@ -2,8 +2,10 @@ import { NextRequest } from 'next/server';
 import { runPipeline, STAGES } from '@/lib/pipeline';
 import { RunRequest, SourceId, Objective, ReportFormat, PipelineMode, TimeFrame } from '@/lib/types';
 import { runWindowFor, consumeRun, clientUid } from '@/lib/usage';
+import { refundRun } from '@/lib/usage';
 import { saveRun } from '@/lib/runs';
 import { hydrateStoredKeys } from '@/lib/keys';
+import { storeSetFlag, storeGet, storeDel } from '@/lib/store';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -26,6 +28,11 @@ function validTf(x: any): TimeFrame | null {
     return { preset: 'custom', start: x.start, end: x.end };
   }
   return { preset: x.preset };
+}
+
+function runWindowConfigTtl(): number {
+  const hours = Number(process.env.RUN_WINDOW_HOURS || '');
+  return (Number.isFinite(hours) && hours > 0 ? hours : 5) * 3600;
 }
 
 function validate(body: any): { req?: RunRequest; error?: string } {
@@ -68,6 +75,7 @@ function validate(body: any): { req?: RunRequest; error?: string } {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const { req: run, error } = validate(body);
+  const runToken = (typeof body?.runToken === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(body.runToken)) ? body.runToken : null;
   const encoder = new TextEncoder();
   const uid = clientUid(req);
   // Cold instances may lack keys saved via the settings UI — pull them from
@@ -113,14 +121,21 @@ export async function POST(req: NextRequest) {
       const runT0 = Date.now();
       console.log(`[stream] run start t+${process.uptime().toFixed(1)}s uid=${uid} platforms=${run!.platforms.join(',')} mode=${run!.mode}`);
       await consumeRun(uid);
+      // Slot marker: lets a dropped stream be refunded exactly once.
+      const slotKey = runToken ? `insight-extractor:runslot:${runToken}` : null;
+      if (slotKey) await storeSetFlag(slotKey, runWindowConfigTtl());
       send({ type: 'stage', stage: STAGES[0], index: 0, total: STAGES.length });
       send({ type: 'log', text: 'Pipeline started — agent booting.', tone: 'info' });
       try {
         const result = await runPipeline(run!, send);
         await saveRun(uid, run!, result);
+        if (slotKey) await storeDel(slotKey);
         console.log(`[stream] run done t+${process.uptime().toFixed(1)}s wall=${Date.now() - runT0}ms kept=${result.keptRecords}`);
       } catch (err) {
         console.error(`[stream] run error t+${process.uptime().toFixed(1)}s wall=${Date.now() - runT0}ms: ${(err as Error).message}`);
+        // Failed runs don't burn the budget.
+        refundRun(uid).catch(() => {});
+        if (slotKey) await storeDel(slotKey).catch(() => {});
         send({ type: 'error', message: (err as Error).message ?? String(err) });
       } finally {
         clearInterval(stallTimer);

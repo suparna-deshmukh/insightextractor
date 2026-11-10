@@ -41,6 +41,19 @@ export async function consumeRun(uid: string): Promise<void> {
   else await storeSetWindow(key, { start: w.start, count: w.count + 1 }, windowMs);
 }
 
+/**
+ * Return a consumed slot when a run FAILS or its stream is dropped —
+ * failed runs must not eat the user's budget. (Client-triggered after a
+ * mid-run connection drop, server-triggered when the pipeline errors.)
+ */
+export async function refundRun(uid: string): Promise<void> {
+  const { windowMs } = runWindowConfig();
+  const key = windowKey(uid);
+  const w = await storeGetWindow(key, windowMs);
+  if (!w || w.count <= 0) return;
+  await storeSetWindow(key, { start: w.start, count: w.count - 1 }, windowMs);
+}
+
 export function clientUid(req: { headers: { get(name: string): string | null } }): string {
   const uid = (req.headers.get('x-insight-extractor-user') || '').trim();
   if (/^[A-Za-z0-9_-]{8,64}$/.test(uid)) return uid;
