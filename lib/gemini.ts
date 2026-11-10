@@ -155,6 +155,22 @@ function modelChain(): string[] {
   return [...new Set([model, ...FALLBACK_CHAIN].filter(Boolean))];
 }
 
+// Model-level cooldown: a model that errors (timeout/5xx) is skipped by
+// every run for a while, so a stuck model can't burn 40s of every request.
+// Stored in the shared KV store — global across all instances.
+const MODEL_COOLDOWN_MS = 10 * 60 * 1000;
+function modelUnwellKey(model: string) {
+  return `insight-extractor:modelunwell:${model}`;
+}
+async function modelInCooldown(model: string): Promise<boolean> {
+  const until = await storeGetInt(modelUnwellKey(model));
+  return until > Date.now();
+}
+async function markModelUnwell(model: string): Promise<void> {
+  const until = Date.now() + MODEL_COOLDOWN_MS;
+  await storeSet(modelUnwellKey(model), String(until), Math.ceil(MODEL_COOLDOWN_MS / 1000));
+}
+
 function isQuotaError(e: unknown): boolean {
   const err = e as { status?: number; message?: string };
   if (err.status === 429) return true;
@@ -227,7 +243,9 @@ interface DispatchOpts {
  *    so the UI shows remaining calls without any extra status request.
  */
 async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string> {
-  const models = modelChain();
+  let models = modelChain();
+  const live = (await Promise.all(models.map(async (m) => ({ m, ok: !(await modelInCooldown(m)) })))).filter((x) => x.ok).map((x) => x.m);
+  if (live.length) models = live; // all in cooldown → still try (last resort)
   const errs: string[] = [];
   // STICKY KEY ORDER, error-driven failover — no probing, no balancing:
   // GEMINI_API_KEY is primary and stays primary for the whole day.
@@ -260,6 +278,7 @@ async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string
           quotaHit = true;
           break; // instantly on to the next key
         }
+        if (e.message !== 'model_missing') await markModelUnwell(model);
         await bumpUsage(n); // transient error: the request was sent — it counts
         await sleep(900);
         continue; // model hiccup → try the next model on the SAME key

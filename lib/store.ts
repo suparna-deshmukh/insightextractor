@@ -289,7 +289,9 @@ export async function storeGetInt(key: string): Promise<number> {
 export async function storeIncr(key: string, amount: number, ttlSeconds?: number): Promise<number> {
   if (parseRedisUrl()) {
     try {
-      const v = await redisCommand(ttlSeconds ? ['INCRBY', key, String(amount), 'EX', String(ttlSeconds)] : ['INCRBY', key, String(amount)]);
+      // INCRBY has no EX option — set the TTL with a separate EXPIRE.
+      const v = await redisCommand(['INCRBY', key, String(amount)]);
+      if (ttlSeconds) await redisCommand(['EXPIRE', key, String(ttlSeconds)]);
       return typeof v === 'number' ? v : 0;
     } catch (e) { warnFallback(e); }
   }
