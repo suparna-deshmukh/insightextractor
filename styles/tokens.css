@@ -1,0 +1,113 @@
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --paper: #F4F5F2;
+  --surface: #FFFFFF;
+  --surface-sunk: #ECEEE9;
+
+  /* Ink (text) */
+  --ink: #161B19;
+  --ink-2: #444D48;
+  --ink-3: #5F6A64;          /* minimum 4.5:1 on paper and surface */
+  --ink-on-action: #FFFFFF;
+
+  /* Lines */
+  --line: #DCE0DA;
+  --line-strong: #BFC6BE;
+
+  /* Action (primary buttons, selected states) */
+  --action: #161B19;
+  --action-hover: #2C3531;
+
+  /* The highlighter. The only accent. */
+  --mark: #FFE15A;
+  --mark-soft: rgba(255, 225, 90, 0.55);
+
+  /* Meaning colours (always paired with an icon or word, never colour alone) */
+  --positive: #17734A;   --positive-bg: #E4F3EB;
+  --negative: #B3361F;   --negative-bg: #FBE9E5;
+  --request:  #2250C4;   --request-bg:  #E6EDFB;
+  --neutral:  #5F6A64;   --neutral-bg:  #ECEEE9;
+  --warn:     #9A5B00;   --warn-bg:     #FBF1DD;
+
+  /* Type */
+  --font-ui: var(--font-figtree), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-voice: var(--font-source-serif), 'Iowan Old Style', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;     /* 12: timestamps in dense tables only */
+  --text-sm: 0.875rem;    /* 14: helper text, labels, meta */
+  --text-base: 1rem;      /* 16: UI body */
+  --text-md: 1.125rem;    /* 18: report body, main text area */
+  --text-lg: 1.25rem;     /* 20: card titles, quotes in lists */
+  --text-xl: 1.5rem;      /* 24: section headings */
+  --text-2xl: 1.875rem;   /* 30: page titles */
+  --text-3xl: clamp(2rem, 1.4rem + 2vw, 2.75rem);  /* Home heading */
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-body: 1.55;
+  --lh-prose: 1.65;
+
+  /* Space (4px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+
+  /* Radius tiers (different levels get different radii) */
+  --r-sm: 6px;      /* badges, small chips, menu items */
+  --r-md: 10px;     /* buttons, inputs, option rows */
+  --r-lg: 16px;     /* panels, popovers, dialogs, drawers */
+  --r-full: 999px;  /* pills and toggle groups only */
+
+  /* Elevation (only floating things get a shadow) */
+  --shadow-pop: 0 1px 2px rgba(22, 27, 25, 0.06), 0 8px 24px rgba(22, 27, 25, 0.12);
+  --shadow-drawer: -8px 0 32px rgba(22, 27, 25, 0.14);
+  --scrim: rgba(22, 27, 25, 0.4);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 120ms;  --dur-2: 200ms;  --dur-3: 400ms;
+
+  /* Layout */
+  --sidebar-w: 264px;
+  --content-max: 760px;
+  --wide-max: 1080px;
+  --rail-w: 200px;
+  --topbar-h: 56px;
+
+  /* Layers */
+  --z-sticky: 10; --z-drawer: 40; --z-pop: 50; --z-toast: 60;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #121513;
+  --surface: #1A1E1C;
+  --surface-sunk: #232825;
+
+  --ink: #EEF1EC;
+  --ink-2: #B7BFB9;
+  --ink-3: #939C96;
+  --ink-on-action: #121513;
+
+  --line: #2D3430;
+  --line-strong: #434C46;
+
+  --action: #EEF1EC;
+  --action-hover: #FFFFFF;
+
+  --mark: #F2D24B;
+  --mark-soft: rgba(242, 210, 75, 0.30);
+
+  --positive: #5CC590;   --positive-bg: rgba(92, 197, 144, 0.14);
+  --negative: #F08A78;   --negative-bg: rgba(240, 138, 120, 0.14);
+  --request:  #8FB0FF;   --request-bg:  rgba(143, 176, 255, 0.14);
+  --neutral:  #939C96;   --neutral-bg:  #232825;
+  --warn:     #E8B04A;   --warn-bg:     rgba(232, 176, 74, 0.14);
+
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
