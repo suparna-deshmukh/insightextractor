@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, BookOpen, Settings } from 'lucide-react';
+import { guarded } from '@/lib/client/navguard';
 import { copy } from '@/lib/copy';
 import { useRuns } from '@/lib/client/health';
 import { useRunMeta } from '@/lib/client/runmeta';
@@ -19,13 +20,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className={styles.sidebarInner} aria-label="Main">
-      <Link href="/" className={styles.logoLink} onClick={onNavigate}>
+      <Link href="/" className={styles.logoLink} onClick={(e) => { guarded(e, '/'); onNavigate?.(); }}>
         <Wordmark />
       </Link>
       <Link
         href="/"
         className={[styles.newResearch, styles.newResearchBtn].filter(Boolean).join(' ')}
-        onClick={onNavigate}
+        onClick={(e) => {
+          guarded(e, '/');
+          onNavigate?.();
+        }}
       >
         <Plus size={18} aria-hidden="true" />
         <span>{copy.nav.newResearch}</span>
@@ -35,7 +39,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         href="/library"
         className={[styles.navRow, pathname.startsWith('/library') && styles.navRowActive].filter(Boolean).join(' ')}
         aria-current={pathname.startsWith('/library') ? 'page' : undefined}
-        onClick={onNavigate}
+        onClick={(e) => {
+          guarded(e, '/library');
+          onNavigate?.();
+        }}
       >
         <BookOpen size={18} aria-hidden="true" />
         <span>{copy.nav.library}</span>
@@ -50,7 +57,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 <Link
                   href={`/research/${r.id}`}
                   className={[styles.recentItem, pathname === `/research/${r.id}` && styles.navRowActive].filter(Boolean).join(' ')}
-                  onClick={onNavigate}
+                  onClick={(e) => {
+                    guarded(e, `/research/${r.id}`);
+                    onNavigate?.();
+                  }}
                 >
                   {runMeta.titleFor(r)}
                 </Link>
@@ -58,7 +68,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </ul>
           {runs.length > 6 && (
-            <Link href="/library" className={styles.seeAll} onClick={onNavigate}>
+            <Link href="/library" className={styles.seeAll} onClick={(e) => { guarded(e, '/library'); onNavigate?.(); }}>
               {copy.nav.seeAll}
             </Link>
           )}
@@ -71,7 +81,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           href="/settings"
           className={[styles.navRow, pathname.startsWith('/settings') && styles.navRowActive].filter(Boolean).join(' ')}
           aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
-          onClick={onNavigate}
+          onClick={(e) => {
+            guarded(e, '/settings');
+            onNavigate?.();
+          }}
         >
           <Settings size={18} aria-hidden="true" />
           <span>{copy.nav.settings}</span>

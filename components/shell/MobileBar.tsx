@@ -7,6 +7,7 @@ import { copy } from '@/lib/copy';
 import { IconButton } from '@/components/ui/IconButton';
 import { Drawer } from '@/components/ui/Drawer';
 import { SidebarContent } from './Sidebar';
+import { getNavGuard } from '@/lib/client/navguard';
 import { Wordmark } from './logo';
 import styles from './shell.module.css';
 
@@ -23,7 +24,15 @@ export function MobileBar() {
         <IconButton
           label={copy.nav.newResearch}
           icon={<Plus size={18} />}
-          onClick={() => {
+          onClick={(e) => {
+            const stop = { preventDefault: () => {} };
+            const g = typeof getNavGuard === 'function' ? getNavGuard() : null;
+            if (g) {
+              (e as unknown as React.MouseEvent).preventDefault?.();
+              g.onLeave('/');
+              return;
+            }
+            void stop;
             setOpen(false);
             router.push('/');
           }}
