@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { copy } from '@/lib/copy';
 import { useNow } from '@/lib/client/time';
 import { useDocumentTitle } from '@/lib/client/useDocumentTitle';

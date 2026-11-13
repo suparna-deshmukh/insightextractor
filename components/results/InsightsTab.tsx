@@ -6,8 +6,9 @@ import type { StoredRun } from '@/lib/client/types';
 import { Prose } from './Prose';
 import { RailNav } from './RailNav';
 import { Section } from './Section';
+import dynamic from 'next/dynamic';
 import { ThemeList } from './ThemeList';
-import { TrendChart } from './TrendChart';
+const TrendChart = dynamic(() => import('./TrendChart').then((m) => m.TrendChart));
 import styles from './insights.module.css';
 
 type Built = { id: string; heading: string; body: React.ReactNode };

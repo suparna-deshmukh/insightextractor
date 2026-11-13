@@ -6,7 +6,6 @@ import { guarded } from '@/lib/client/navguard';
 import { copy } from '@/lib/copy';
 import { useRuns } from '@/lib/client/health';
 import { useRunMeta } from '@/lib/client/runmeta';
-import { timeAgo } from '@/lib/client/time';
 import { Wordmark } from './logo';
 import { UsageMeter } from './UsageMeter';
 import styles from './shell.module.css';

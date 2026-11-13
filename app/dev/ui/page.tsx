@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
 import {
-  Plus, Search, Check, X, Download, Copy, Info, TriangleAlert, Layers, Gauge, Clock,
+  Plus, Search, Check, Download, Copy, Info, TriangleAlert, Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';

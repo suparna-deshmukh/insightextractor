@@ -2,7 +2,7 @@ import { Circle, CircleAlert, Frown, Lightbulb, Meh, Smile, ThumbsUp } from 'luc
 import { Badge } from '@/components/ui/Badge';
 import { Disclosure } from '@/components/ui/Disclosure';
 import { copy } from '@/lib/copy';
-import { kindLabel, kindOf, relDate, sentimentLabel, sentimentText } from '@/lib/client/insights';
+import { kindLabel, kindOf, sentimentLabel, sentimentText } from '@/lib/client/insights';
 import type { BucketStats } from '@/lib/types';
 import { QuoteCard } from './QuoteCard';
 import styles from './insights.module.css';

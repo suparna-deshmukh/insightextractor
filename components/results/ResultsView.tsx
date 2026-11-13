@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as RTabs from '@radix-ui/react-tabs';
 import { Database } from 'lucide-react';
@@ -11,14 +12,13 @@ import { parseReport } from '@/lib/client/report';
 import { useRunMeta } from '@/lib/client/runmeta';
 import { useDocumentTitle } from '@/lib/client/useDocumentTitle';
 import type { StoredRun } from '@/lib/client/types';
-import { ExportMenu } from './ExportMenu';
-import { MethodDrawer } from './MethodDrawer';
+// PLAN-NOTE: 7.5 dynamic imports keep the results frame light on first load.
+const MethodDrawer = dynamic(() => import('./MethodDrawer').then((m) => m.MethodDrawer));
 import { Notices } from './Notices';
-import { Prose } from './Prose';
 import { ResultHeader } from './ResultHeader';
 import { ThemeList } from './ThemeList';
 import { InsightsTab } from './InsightsTab';
-import { EvidenceTab } from './EvidenceTab';
+const EvidenceTab = dynamic(() => import('./EvidenceTab').then((m) => m.EvidenceTab));
 import styles from './results.module.css';
 
 export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnly?: boolean }) {
