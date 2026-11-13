@@ -191,7 +191,7 @@ const OBJECTIVE_TO_GOAL: Record<ClientRequest['objective'], GoalKey> = {
   'feature-prioritization': 'prioritize',
 };
 
-const FORMAT_TO_STYLE: Record<ClientRequest['format'], StyleKey> = {
+export const FORMAT_TO_STYLE: Record<ClientRequest['format'], StyleKey> = {
   'one-pager': 'standard',
   'exec-brief': 'brief',
   'full-report': 'indepth',
