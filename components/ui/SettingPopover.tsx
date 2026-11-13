@@ -12,22 +12,31 @@ export function SettingPopover({
   value,
   children,
   width = 380,
+  open: controlledOpen,
+  onOpenChange: controlledChange,
+  triggerRef,
 }: {
   icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
   children: React.ReactNode;
   width?: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 }) {
   const isMobile = useMediaQuery('(max-width: 640px)');
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledChange ?? setInternalOpen;
 
   const trigger = (
     <button
       type="button"
+      ref={triggerRef}
       className={[styles.trigger, open && styles.triggerOpen].filter(Boolean).join(' ')}
       aria-expanded={open}
-      onClick={() => setOpen((o) => !o)}
+      onClick={() => setOpen(!open)}
     >
       <span className={styles.icon} aria-hidden="true">{icon}</span>
       <span className={styles.textBlock}>
