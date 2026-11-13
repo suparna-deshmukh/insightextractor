@@ -181,3 +181,48 @@ export function changeCount(form: FormState): number {
   if (form.tone !== 'neutral') n++;
   return n;
 }
+
+
+const OBJECTIVE_TO_GOAL: Record<ClientRequest['objective'], GoalKey> = {
+  'problem-discovery': 'problem',
+  'product-validation': 'validate',
+  'post-launch': 'launch',
+  'competitor-teardown': 'competitors',
+  'feature-prioritization': 'prioritize',
+};
+
+const FORMAT_TO_STYLE: Record<ClientRequest['format'], StyleKey> = {
+  'one-pager': 'standard',
+  'exec-brief': 'brief',
+  'full-report': 'indepth',
+  'raw-data': 'sheet',
+  'data-first': 'standard',
+};
+
+/** Rebuild the form from a stored request (Edit and run again). */
+export function formFromRequest(req: ClientRequest): FormState {
+  const tf = req.timeframes.default;
+  const hadCompetitors = req.competitors.length > 0;
+  return {
+    ...defaultForm,
+    description: req.description,
+    goal: OBJECTIVE_TO_GOAL[req.objective] ?? 'problem',
+    name: req.topic,
+    industry: req.industry,
+    audience: req.audience,
+    competitors: req.competitors.join(', '),
+    brand: req.brandHint,
+    keywords: req.keywords.join(', '),
+    focusAreas: FOCUS_AREAS.map((v, i) => (req.focusAreas.includes(v) ? i : -1)).filter((i) => i >= 0),
+    compare: req.compareCompetitors || !hadCompetitors,
+    compareTouched: true,
+    style: FORMAT_TO_STYLE[req.format] ?? 'standard',
+    length: req.reportLength,
+    tone: req.tone,
+    depth: req.mode === 'deep' ? 'deep' : 'quick',
+    time: { preset: tf.preset, start: tf.start, end: tf.end },
+    sources: SOURCE_ORDER.filter((id) => req.platforms.includes(id)),
+    sourcesTouched: true,
+    apps: req.appsHint.join(', '),
+  };
+}

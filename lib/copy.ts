@@ -33,6 +33,7 @@ export const copy = {
     examplesTitle: 'Not sure where to start? Try one of these.',
     recentTitle: 'Pick up where you left off',
     sampleLink: 'See a sample report',
+    loadFailed: 'We could not load that research.',
     editingFrom: (title: string) => `Editing the settings from “${title}”.`,
     editingCancel: 'Start from scratch instead',
     validation: {
@@ -120,7 +121,9 @@ export const copy = {
   fine: {
     title: 'Fine-tune',
     sub: 'Optional. The defaults work well for most research.',
+    changes: (n: number) => (n === 1 ? '1 change' : `${n} changes`),
     name: { label: 'Name this research', helper: 'Leave blank and we will name it for you.' },
+    aboutMarket: 'About your market',
     industry: { label: 'Industry', placeholder: 'For example: Food delivery' },
     audience: { label: 'Who are the people?', placeholder: 'For example: Working parents' },
     competitors: {
