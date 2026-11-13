@@ -59,11 +59,6 @@
 .inlineCompetitors {
   margin-top: 12px;
   max-width: 480px;
-  animation: fadeDown var(--dur-2) var(--ease);
-}
-@keyframes fadeDown {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .settingsRow { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
