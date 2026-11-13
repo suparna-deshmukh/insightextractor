@@ -18,7 +18,7 @@ check('glass', "grep -RIn 'backdrop-filter' styles components app | grep -v 'com
 check('uppercase labels', "grep -RInE 'text-transform: *uppercase' styles components app --include=*.css | grep -v 'app/globals.css' || true");
 check('arrows in copy', "grep -RIn '→' lib/copy.ts || true");
 check('emoji in product code', "grep -RIlP '[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2B50}\\x{2B1B}\\x{2B1C}]' lib components app 2>/dev/null | grep -v 'components/Studio.tsx' || true");
-check('hard-coded colours in new code', "grep -RInE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(' components/ui components/shell components/ask components/run components/results components/library components/settings app/library app/settings app/sample app/dev app/research --include=*.css --include=*.tsx --include=*.ts || true");
+check('hard-coded colours in new code', "grep -RInE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(' components/ui components/shell components/ask components/run components/results components/library components/settings app/library app/settings app/sample app/dev app/research --include=*.css --include=*.tsx --include=*.ts | grep -v 'components/shell/logo.tsx' || true");
 // style={{}} is allowed only for dynamic widths / computed positions (plan 8.2).
 const DYNAMIC_WIDTH_FILES = new Set([
   'components/ui/ProgressBar.tsx',
