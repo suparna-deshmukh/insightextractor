@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Figtree, Source_Serif_4 } from 'next/font/google';
-// Legacy styles for the old Studio (deleted in Phase 8).
-import './globals.css';
 import '@/styles/tokens.css';
 import '@/styles/base.css';
 
