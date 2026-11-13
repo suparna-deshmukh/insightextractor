@@ -27,8 +27,9 @@ const DYNAMIC_WIDTH_FILES = new Set([
   'components/ui/Popover.tsx',
   'components/ui/Drawer.tsx',
   'components/ui/SettingPopover.tsx',
+  'components/results/ThemeRow.tsx', // dynamic bar width (true scale)
 ]);
-check('inline styles in components', "grep -RIn 'style={{' components/ui components/shell components/ask components/run components/results components/library components/settings | grep -vE '(ProgressBar|Skeleton|SourceIcon|Popover|Drawer|SettingPopover)\.(tsx)' || true");
+check('inline styles in components', "grep -RIn 'style={{' components/ui components/shell components/ask components/run components/results components/library components/settings | grep -vE '(ProgressBar|Skeleton|SourceIcon|Popover|Drawer|SettingPopover|ThemeRow)\.(tsx)' || true");
 check('TODO/console.log in new code', "grep -RInE 'TODO|console\\.log' lib/client lib/copy.ts components/ui components/shell components/ask components/run components/results components/library components/settings app/research app/library app/settings app/sample app/dev || true");
 
 if (fails.length) {
