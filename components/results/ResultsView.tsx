@@ -9,6 +9,7 @@ import { copy } from '@/lib/copy';
 import { downloadFile, fileNames, rawCsv } from '@/lib/client/exports';
 import { parseReport } from '@/lib/client/report';
 import { useRunMeta } from '@/lib/client/runmeta';
+import { useDocumentTitle } from '@/lib/client/useDocumentTitle';
 import type { StoredRun } from '@/lib/client/types';
 import { ExportMenu } from './ExportMenu';
 import { MethodDrawer } from './MethodDrawer';
@@ -20,7 +21,7 @@ import { InsightsTab } from './InsightsTab';
 import { EvidenceTab } from './EvidenceTab';
 import styles from './results.module.css';
 
-export function ResultsView({ run }: { run: StoredRun }) {
+export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnly?: boolean }) {
   const router = useRouter();
   const sp = useSearchParams();
   const toast = useToast();
@@ -40,9 +41,7 @@ export function ResultsView({ run }: { run: StoredRun }) {
     }
   }, [run.id]);
 
-  useEffect(() => {
-    document.title = `${titleFor({ id: run.id, topic: result.topic })} · ${copy.app.name}`;
-  }, [run.id, result.topic, titleFor]);
+  useDocumentTitle(`${titleFor({ id: run.id, topic: result.topic })} · ${copy.app.name}`);
 
   const sections = useMemo(() => parseReport(result.report), [result.report]);
   // PLAN-NOTE: "empty or only a stub" has no exact server contract; treat a report with
@@ -69,7 +68,7 @@ export function ResultsView({ run }: { run: StoredRun }) {
     return (
       <div className={styles.page}>
         <div className={styles.main}>
-          <ResultHeader run={run} onMethod={() => setMethodOpen(true)} />
+          <ResultHeader run={run} readOnly={readOnly} onMethod={() => setMethodOpen(true)} />
           <Notices run={run} sections={sections} />
           <div className={styles.sheet}>
             <h2 className={styles.sheetTitle}>{copy.results.sheetReadyTitle}</h2>
@@ -97,7 +96,7 @@ export function ResultsView({ run }: { run: StoredRun }) {
   return (
     <div className={styles.page}>
       <div className={styles.main}>
-        <ResultHeader run={run} onMethod={() => setMethodOpen(true)} />
+        <ResultHeader run={run} readOnly={readOnly} onMethod={() => setMethodOpen(true)} />
         <Notices run={run} sections={sections} />
       </div>
       <RTabs.Root value={tab} onValueChange={(v) => setTab(v as 'insights' | 'evidence')}>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { copy } from '@/lib/copy';
 import { useNow } from '@/lib/client/time';
+import { useDocumentTitle } from '@/lib/client/useDocumentTitle';
 import type { useRunner } from '@/lib/client/useRunner';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -34,12 +35,10 @@ export function RunView({
   const keepGoingRef = useRef<HTMLButtonElement | null>(null);
 
   // Document title while running.
-  useEffect(() => {
-    if (state.phase === 'running') {
-      const n = Math.min(state.stageIndex + 1, state.stageTotal);
-      document.title = `${copy.run.tabTitleRunning(n, state.stageTotal)} · ${copy.app.name}`;
-    }
-  }, [state.phase, state.stageIndex, state.stageTotal]);
+  const n = Math.min(state.stageIndex + 1, state.stageTotal);
+  useDocumentTitle(
+    state.phase === 'running' ? `${copy.run.tabTitleRunning(n, state.stageTotal)} · ${copy.app.name}` : null,
+  );
 
   const notice =
     state.notice === 'slow' ? copy.run.noticeSlow : state.notice === 'retry' ? copy.run.noticeRetry : state.notice === 'reconnect' ? copy.run.noticeReconnect : null;
