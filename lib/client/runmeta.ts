@@ -34,6 +34,8 @@ if (typeof window !== 'undefined') {
 
 let snapshotCache: { raw: string | null; meta: RunMetaMap } | null = null;
 
+const EMPTY_META = {} as RunMetaMap;
+
 function getSnapshot(): RunMetaMap {
   const raw = typeof window === 'undefined' ? null : localStorage.getItem(KEY);
   if (snapshotCache && snapshotCache.raw === raw) return snapshotCache.meta;
@@ -74,7 +76,7 @@ export function useRunMeta() {
       return () => listeners.delete(cb);
     },
     getSnapshot,
-    () => ({} as RunMetaMap),
+    () => EMPTY_META,
   );
   return {
     meta,
