@@ -48,7 +48,7 @@ export function EvidenceCards({
               <Badge tone="neutral">{bucketName(r.bucket)}</Badge>
                   <Feeling sentiment={r.sentiment} />
               <span className={styles.cardReactions}>
-                {r.score} {r.score === 1 ? 'reaction' : 'reactions'}
+                {copy.evidence.reactionsCount(r.score)}
               </span>
             </div>
             <div className={styles.rowActions}>

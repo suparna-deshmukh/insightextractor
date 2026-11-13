@@ -2,6 +2,7 @@
 import * as RDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { IconButton } from './IconButton';
+import { copy } from '@/lib/copy';
 import styles from './Drawer.module.css';
 
 export function Drawer({
@@ -27,10 +28,10 @@ export function Drawer({
           <header className={styles.header}>
             <RDialog.Title className={styles.title}>{title}</RDialog.Title>
             <RDialog.Close asChild>
-              <IconButton label="Close" icon={<X size={18} />} />
+              <IconButton label={copy.common.close} icon={<X size={18} />} />
             </RDialog.Close>
           </header>
-          <RDialog.Description className="sr-only">Panel: {title}</RDialog.Description>
+          <RDialog.Description className="sr-only">{copy.common.panel(title)}</RDialog.Description>
           <div className={styles.body}>{children}</div>
         </RDialog.Content>
       </RDialog.Portal>

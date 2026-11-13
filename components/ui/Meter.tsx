@@ -1,3 +1,4 @@
+import { copy } from '@/lib/copy';
 import styles from './Meter.module.css';
 
 export function Meter({ total, left }: { total: number; left: number }) {
@@ -9,7 +10,7 @@ export function Meter({ total, left }: { total: number; left: number }) {
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={left}
-      aria-label={`${left} of ${total} left`}
+      aria-label={copy.common.meterLeft(left, total)}
     >
       {Array.from({ length: segments }, (_, i) => (
         <span key={i} className={i < left ? styles.filled : styles.emptySeg} />

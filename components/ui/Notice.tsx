@@ -1,4 +1,5 @@
 import { Info, TriangleAlert, X } from 'lucide-react';
+import { copy } from '@/lib/copy';
 import styles from './Notice.module.css';
 
 export function Notice({
@@ -26,7 +27,7 @@ export function Notice({
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>
       {onDismiss && (
-        <button type="button" className={styles.dismiss} onClick={onDismiss} aria-label="Dismiss notice">
+        <button type="button" className={styles.dismiss} onClick={onDismiss} aria-label={copy.common.dismiss}>
           <X size={16} aria-hidden="true" />
         </button>
       )}

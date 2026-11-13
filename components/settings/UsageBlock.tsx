@@ -55,7 +55,7 @@ export function UsageBlock({ health }: { health: HealthView | null }) {
               <tbody>
                 {keys.map((k, i) => (
                   <tr key={k.name}>
-                    <td>{`Key ${i + 1}`}</td>
+                    <td>{copy.settings.usage.keyName(i + 1)}</td>
                     <td className={styles.num}>{k.used}</td>
                     <td className={styles.num}>{k.remaining}</td>
                     <td>

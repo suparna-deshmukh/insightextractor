@@ -276,6 +276,8 @@ export const copy = {
     clear: 'Clear filters',
     readMore: 'Read more',
     showLess: 'Show less',
+    // PLAN-NOTE: the card's reactions line has no deck entry; added here.
+    reactionsCount: (n: number) => `${n} ${n === 1 ? 'reaction' : 'reactions'}`,
     allThemes: 'All themes',
     allSources: 'All sources',
   },
@@ -374,6 +376,8 @@ export const copy = {
       statusLive: 'Working',
       statusExhausted: 'Used up for today',
       statusRetry: (m: number) => `Retrying in ${m} min`,
+    // PLAN-NOTE: the per-key table names keys "Key 1..3" per the plan; no deck entry.
+    keyName: (i: number) => `Key ${i}`,
     },
     appearance: { title: 'Appearance', system: 'Match my device', light: 'Light', dark: 'Dark' },
     data: {
@@ -413,6 +417,10 @@ export const copy = {
   common: {
     save: 'Save', cancel: 'Cancel', close: 'Close', done: 'Done', optional: 'optional',
     loading: 'Loading', retry: 'Try again', copy: 'Copy', back: 'Back',
+    // PLAN-NOTE: accessibility strings not covered by the deck, added to keep copy centralized.
+    dismiss: 'Dismiss notice',
+    panel: (t: string) => `Panel: ${t}`,
+    meterLeft: (left: number, total: number) => `${left} of ${total} left`,
   },
 
   units: {
