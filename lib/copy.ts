@@ -297,6 +297,9 @@ export const copy = {
     analysts: 'For analysts: the SQL we ran',
     sqlRows: (n: number) => `${n} rows`,
     copySql: 'Copy SQL',
+    // PLAN-NOTE: the plan's method drawer headings have no deck entries; added here to keep copy centralized.
+    cleanedHeading: 'How we cleaned it',
+    notes: 'Method notes',
   },
 
   export: {
