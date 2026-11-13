@@ -1,16 +1,44 @@
 'use client';
+import { Suspense } from 'react';
+import Link from 'next/link';
 import { AppShell } from '@/components/shell/AppShell';
+import { Button } from '@/components/ui/Button';
+import { Notice } from '@/components/ui/Notice';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { copy } from '@/lib/copy';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Info } from 'lucide-react';
+import { sampleRun } from '@/lib/sample-run';
+import { ResultsView } from '@/components/results/ResultsView';
+
+const run = sampleRun();
 
 export default function SamplePage() {
   return (
     <AppShell>
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 24 }}>
-        <h1 tabIndex={-1} className="sr-only">Sample report</h1>
-        <EmptyState icon={<Info size={22} />} title={copy.sample.banner} />
+      <div className="sample-banner">
+        <Notice
+          tone="info"
+          actions={
+            <Link href="/">
+              <Button variant="primary" size="sm">
+                {copy.sample.action}
+              </Button>
+            </Link>
+          }
+        >
+          {copy.sample.banner}
+        </Notice>
       </div>
+      <Suspense
+        fallback={
+          <div className="sample-skeleton">
+            <Skeleton width="50%" height={28} />
+            <Skeleton width="80%" height={16} />
+            <Skeleton width="100%" height={240} />
+          </div>
+        }
+      >
+        <ResultsView run={run} readOnly />
+      </Suspense>
     </AppShell>
   );
 }

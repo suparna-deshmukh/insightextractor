@@ -12,7 +12,15 @@ import { ExportMenu } from './ExportMenu';
 import styles from './results.module.css';
 import type { StoredRun } from '@/lib/client/types';
 
-export function ResultHeader({ run, onMethod }: { run: StoredRun; onMethod: () => void }) {
+export function ResultHeader({
+  run,
+  onMethod,
+  readOnly = false,
+}: {
+  run: StoredRun;
+  onMethod: () => void;
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const toast = useToast();
   const { titleFor, rename } = useRunMeta();
@@ -66,7 +74,7 @@ export function ResultHeader({ run, onMethod }: { run: StoredRun; onMethod: () =
               {title}
             </h1>
           )}
-          {!editing && (
+          {!editing && !readOnly && (
             <IconButton
               label={copy.results.rename}
               icon={<Pencil size={15} aria-hidden="true" />}
@@ -79,12 +87,14 @@ export function ResultHeader({ run, onMethod }: { run: StoredRun; onMethod: () =
           {meta} <button type="button" className={styles.linkBtn} onClick={onMethod}>{copy.results.howMade}</button>
         </p>
       </div>
-      <div className={styles.actions}>
-        <ExportMenu run={run} />
-        <Button variant="secondary" size="md" onClick={() => router.push(`/?from=${encodeURIComponent(run.id)}`)}>
-          {copy.results.editRun}
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className={styles.actions}>
+          <ExportMenu run={run} />
+          <Button variant="secondary" size="md" onClick={() => router.push(`/?from=${encodeURIComponent(run.id)}`)}>
+            {copy.results.editRun}
+          </Button>
+        </div>
+      )}
     </header>
   );
 }

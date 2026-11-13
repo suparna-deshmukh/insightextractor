@@ -25,3 +25,7 @@ mark, .mark { background: var(--mark-soft); color: inherit; border-radius: 3px; 
   .results-layout { grid-template-columns: 1fr !important; }
   a[href^='http']::after { content: ' (' attr(href) ')'; font-size: 0.75em; word-break: break-all; }
 }
+
+.sample-banner { max-width: var(--wide-max); margin: 0 auto; padding: 24px 24px 0; }
+
+.sample-skeleton { max-width: var(--content-max); margin: 0 auto; padding: 24px; display: grid; gap: 12px; }
