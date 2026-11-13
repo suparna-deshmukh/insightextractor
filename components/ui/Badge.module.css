@@ -1,0 +1,20 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.icon { display: inline-flex; }
+.icon svg { width: 14px; height: 14px; }
+
+.positive { color: var(--positive); background: var(--positive-bg); }
+.negative { color: var(--negative); background: var(--negative-bg); }
+.request { color: var(--request); background: var(--request-bg); }
+.neutral { color: var(--neutral); background: var(--neutral-bg); }
+.warn { color: var(--warn); background: var(--warn-bg); }

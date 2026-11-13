@@ -1,0 +1,19 @@
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.iconBtn:hover:not(:disabled) { background: var(--surface-sunk); }
+.iconBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.secondary { border-color: var(--line-strong); background: var(--surface); }
+@media (max-width: 640px) {
+  .iconBtn { width: 44px; height: 44px; }
+}
