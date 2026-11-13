@@ -1,0 +1,9 @@
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  flex: none;
+}
