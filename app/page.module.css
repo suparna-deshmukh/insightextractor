@@ -1,0 +1,2 @@
+.fallback { max-width: 760px; margin: 0 auto; padding: 24px; }
+.fallbackBlocks { display: grid; gap: 12px; margin-top: 32px; }

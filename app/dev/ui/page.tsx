@@ -29,19 +29,18 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { Highlight } from '@/components/ui/Highlight';
 import { SourceIcon } from '@/components/ui/SourceIcon';
+import styles from './page.module.css';
 
 const SOURCES = ['reddit', 'google', 'hn', 'github', 'producthunt', 'appstore', 'play', 'youtube'] as const;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 48 }}>
-      <h2 style={{ fontSize: 'var(--text-xl)', marginBottom: 16 }}>{title}</h2>
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
       {children}
     </section>
   );
 }
-
-const gap = { display: 'flex', flexWrap: 'wrap' as const, gap: 12, alignItems: 'center' };
 
 function Gallery() {
   const toast = useToast();
@@ -63,18 +62,18 @@ function Gallery() {
   };
 
   return (
-    <main id="main" style={{ maxWidth: 1080, margin: '0 auto', padding: 24 }}>
-      <h1 tabIndex={-1} style={{ fontSize: 'var(--text-2xl)' }}>Component gallery</h1>
-      <p style={{ color: 'var(--ink-2)', margin: '8px 0 24px' }}>Every component in its main states. Development only.</p>
+    <main id="main" className={styles.page}>
+      <h1 tabIndex={-1} className={styles.pageTitle}>Component gallery</h1>
+      <p className={styles.pageSub}>Every component in its main states. Development only.</p>
 
       <Section title="Theme">
-        <div style={gap}>
+        <div className={styles.rowWrap}>
           <Button variant="secondary" onClick={toggleTheme}>{dark ? 'Light theme' : 'Dark theme'}</Button>
         </div>
       </Section>
 
       <Section title="Button">
-        <div style={gap}>
+        <div className={styles.rowWrap}>
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
           <Button variant="ghost">Ghost</Button>
@@ -87,7 +86,7 @@ function Gallery() {
       </Section>
 
       <Section title="IconButton">
-        <div style={gap}>
+        <div className={styles.rowWrap}>
           <Tooltip label="New research"><IconButton label="New research" icon={<Plus size={18} />} /></Tooltip>
           <Tooltip label="Search"><IconButton label="Search" icon={<Search size={18} />} variant="secondary" /></Tooltip>
           <IconButton label="Copy" icon={<Copy size={18} />} disabled />
@@ -95,7 +94,7 @@ function Gallery() {
       </Section>
 
       <Section title="Field">
-        <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
+        <div className={styles.col480}>
           <Field label="Industry" optional htmlFor="g-ind">
             <Input id="g-ind" placeholder="For example: Food delivery" />
           </Field>
@@ -109,7 +108,7 @@ function Gallery() {
       </Section>
 
       <Section title="ToggleGroup">
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className={styles.stack12}>
           <ToggleGroup
             ariaLabel="Goal"
             options={[{ value: 'problem', label: 'Find problems' }, { value: 'validate', label: 'Test an idea' }, { value: 'launch', label: 'Review a launch' }]}
@@ -140,9 +139,9 @@ function Gallery() {
       </Section>
 
       <Section title="Checkbox and Badge">
-        <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
+        <div className={styles.col480}>
           <Checkbox checked={checked} onCheckedChange={setChecked} label="Add a side-by-side comparison" />
-          <div style={gap}>
+          <div className={styles.rowWrap}>
             <Badge tone="positive" icon={<Check size={14} aria-hidden="true" />}>Working</Badge>
             <Badge tone="negative" icon={<TriangleAlert size={14} aria-hidden="true" />}>Failing</Badge>
             <Badge tone="request">Request</Badge>
@@ -153,7 +152,7 @@ function Gallery() {
       </Section>
 
       <Section title="Chip">
-        <div style={gap}>
+        <div className={styles.rowWrap}>
           {chips.map((c) => (
             <Chip key={c} onRemove={() => setChips((cs) => cs.filter((x) => x !== c))}>{c}</Chip>
           ))}
@@ -162,23 +161,23 @@ function Gallery() {
 
       <Section title="Disclosure">
         <Disclosure title="Show technical log" sub="Optional detail" open={discOpen} onOpenChange={setDiscOpen}>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, padding: '12px 0' }}>09:41:22  Pipeline started.</p>
+          <p className={styles.logLine}>09:41:22  Pipeline started.</p>
         </Disclosure>
       </Section>
 
       <Section title="Popover and SettingPopover">
-        <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
+        <div className={styles.col480}>
           <SettingPopover icon={<Layers size={18} aria-hidden="true" />} label="Where to look" value="Reddit and Google searches">
-            <p style={{ padding: 8 }}>Panel content here.</p>
+            <p className={styles.pad8}>Panel content here.</p>
           </SettingPopover>
           <Popover trigger={<Button variant="secondary" size="sm">Open popover</Button>}>
-            <p style={{ padding: 8 }}>Popover content.</p>
+            <p className={styles.pad8}>Popover content.</p>
           </Popover>
         </div>
       </Section>
 
       <Section title="Dialog and Drawer">
-        <div style={gap}>
+        <div className={styles.rowWrap}>
           <Button variant="secondary" onClick={() => setDialogOpen(true)}>Open dialog</Button>
           <Button variant="secondary" onClick={() => setDrawerOpen(true)}>Open drawer</Button>
           <Button variant="secondary" onClick={() => toast({ message: 'Report copied' })}>Show toast</Button>
@@ -207,21 +206,21 @@ function Gallery() {
       </Section>
 
       <Section title="Meter and ProgressBar">
-        <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
+        <div className={styles.col480}>
           <div>
             <Meter total={5} left={4} />
-            <p style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 8 }}>4 of 5 researches left</p>
+            <p className={styles.meterNote}>4 of 5 researches left</p>
           </div>
           <div>
             <ProgressBar value={31} max={40} label="AI capacity today" />
-            <p style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 8 }}>31 of 40 used</p>
+            <p className={styles.meterNote}>31 of 40 used</p>
           </div>
         </div>
       </Section>
 
       <Section title="Spinner, Skeleton, Notice, EmptyState">
-        <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
-          <div style={gap}>
+        <div className={styles.col480}>
+          <div className={styles.rowWrap}>
             <Spinner />
             <Skeleton width={120} height={16} />
             <Skeleton width={200} height={40} />
@@ -237,11 +236,11 @@ function Gallery() {
       </Section>
 
       <Section title="Highlight and SourceIcon">
-        <div style={{ display: 'grid', gap: 16 }}>
-          <p style={{ maxWidth: 520 }}>
+        <div className={styles.colAuto}>
+          <p className={styles.wideNote}>
             <Highlight text="Third time this month my box arrived two days late. Support never answers." terms={['late', 'support']} />
           </p>
-          <div style={gap}>
+          <div className={styles.rowWrap}>
             {SOURCES.map((s) => <SourceIcon key={s} id={s} />)}
           </div>
         </div>

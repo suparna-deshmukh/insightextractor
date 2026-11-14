@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Dialog } from '@/components/ui/Dialog';
 import { useToast } from '@/components/ui/Toast';
 import { SearchX } from 'lucide-react';
+import styles from './page.module.css';
 
 const newToken = () => 'rt_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -150,7 +151,7 @@ function ResearchView({ id }: { id: string }) {
   const content = (() => {
     if (!loaded) {
       return (
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 24, display: 'grid', gap: 12 }}>
+      <div className={styles.centered}>
         <h1 className="sr-only" tabIndex={-1}>
           Research
         </h1>
@@ -169,7 +170,7 @@ function ResearchView({ id }: { id: string }) {
         title={copy.notFound.title}
         body={copy.notFound.body}
         action={
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className={styles.actions}>
             <Button variant="primary" onClick={() => router.push('/library')}>
               {copy.notFound.primary}
             </Button>
@@ -234,7 +235,7 @@ function ResearchView({ id }: { id: string }) {
       return <ResultsView run={storedRun} />;
     }
     return (
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 24, display: 'grid', gap: 12 }}>
+      <div className={styles.centered}>
         <Skeleton width="60%" height={28} />
         <Skeleton width="100%" height={200} />
       </div>
@@ -289,7 +290,7 @@ export default function ResearchPage() {
     <AppShell>
       <Suspense
         fallback={
-          <div style={{ maxWidth: 760, margin: '0 auto', padding: 24 }}>
+          <div className={styles.centered}>
             <Skeleton width="100%" height={200} />
           </div>
         }
