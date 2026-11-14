@@ -7,7 +7,7 @@
 .sectionFirst { margin-top: 24px; }
 .section h2 { font-size: var(--text-xl); font-weight: 600; margin: 0 0 12px; }
 .sectionBody { color: var(--ink-2); line-height: var(--lh-body); margin: 0 0 16px; }
-.link { color: var(--ink); }
+.link { color: var(--accent); }
 
 .keyRow { margin-bottom: 20px; }
 .keyLabel { margin: 0; font-size: var(--text-base); font-weight: 600; }
@@ -19,30 +19,31 @@
   font-family: var(--font-ui);
   font-size: var(--text-base);
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: 10px 44px 10px 12px;
 }
+.keyInput:focus { border-color: var(--line-strong); }
 .keyInput::placeholder { color: var(--ink-3); }
 .eyeBtn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 .keyError { margin: 8px 0 0; font-size: var(--text-sm); color: var(--negative); }
 .keyStatus { margin: 8px 0 0; font-size: var(--text-sm); color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
-.replaceHint { color: var(--ink-3); }
+.replaceHint { color: var(--ink-2); }
 
 .usage { display: grid; gap: 20px; }
 .usageBlock { display: grid; gap: 8px; }
 .usageLine { margin: 0; font-size: var(--text-base); }
-.usageSub { margin: 0; font-size: var(--text-sm); color: var(--ink-3); }
+.usageSub { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
 .perKeyTable { border-collapse: collapse; width: 100%; margin-top: 4px; }
 .perKeyTable th {
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: left;
   padding: 6px 8px 6px 0;
 }
-.perKeyTable td { font-size: 15px; padding: 8px 8px 8px 0; border-top: 1px solid var(--line); }
+.perKeyTable td { font-size: 15px; padding: 8px 8px 8px 0; border-top: 1px solid var(--line-subtle); }
 .perKeyTable td.num { font-variant-numeric: tabular-nums; }
 
 .sources { display: grid; gap: 16px; }
@@ -60,11 +61,12 @@
   font-family: var(--font-ui);
   font-size: var(--text-base);
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: 10px 12px;
 }
+.otherKeys input:focus { border-color: var(--line-strong); }
 .otherKeys input::placeholder { color: var(--ink-3); }
 
 .subHeading { margin: 20px 0 8px; font-size: var(--text-base); font-weight: 600; }

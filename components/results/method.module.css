@@ -1,6 +1,6 @@
 .method { display: grid; gap: 24px; }
 .method p { margin: 0; color: var(--ink); line-height: var(--lh-body); }
-.heading { margin: 0 0 10px; font-size: var(--text-sm); font-weight: 600; color: var(--ink-3); }
+.heading { margin: 0 0 10px; font-size: var(--text-sm); font-weight: 600; color: var(--ink-2); }
 .sub { margin: 12px 0 8px; font-size: var(--text-sm); color: var(--ink-2); font-weight: 500; }
 .chipRow { display: flex; flex-wrap: wrap; gap: 8px; }
 .questions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -19,11 +19,11 @@
 .whereTable th {
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: left;
   padding: 6px 8px 6px 0;
 }
-.whereTable td { font-size: 15px; padding: 8px; padding-left: 0; border-top: 1px solid var(--line); vertical-align: top; }
+.whereTable td { font-size: 15px; padding: 8px; padding-left: 0; border-top: 1px solid var(--line-subtle); vertical-align: top; }
 .whereTable td.num { font-variant-numeric: tabular-nums; }
 .srcCell { display: inline-flex; align-items: center; gap: 8px; }
 .sqlList { display: grid; gap: 20px; }

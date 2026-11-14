@@ -22,7 +22,7 @@
 }
 .progressRow .track { flex: 1; }
 .stepLabel { font-size: 14px; color: var(--ink-2); flex: none; }
-.elapsed { font-size: 14px; color: var(--ink-3); flex: none; }
+.elapsed { font-size: 14px; color: var(--ink-2); flex: none; }
 
 .stepList {
   list-style: none;
@@ -54,7 +54,7 @@
   place-items: center;
 }
 .stepLabelDone, .stepLabelWaiting { color: var(--ink); }
-.stepLabelWaiting { color: var(--ink-3); }
+.stepLabelWaiting { color: var(--ink-2); }
 .stepLabelActive { font-weight: 600; color: var(--ink); }
 .stepLabelFailed { color: var(--negative); }
 .markerFailed { color: var(--negative); display: grid; place-items: center; }
@@ -73,13 +73,13 @@
   color: var(--ink-2);
 }
 .srcName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.srcStatus { flex: none; color: var(--ink-3); }
+.srcStatus { flex: none; color: var(--ink-2); }
 .srcStatusWarn { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); }
 .srcIconSm { flex: none; border-radius: 6px; }
 .summaryLine {
   margin-left: 34px;
   font-size: 14px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   background: none;
   border: none;
   padding: 4px 0;
@@ -88,7 +88,7 @@
   text-align: left;
 }
 .summaryLine:hover { color: var(--ink); }
-.liveTotal { margin-left: 34px; font-size: 14px; color: var(--ink-3); }
+.liveTotal { margin-left: 34px; font-size: 14px; color: var(--ink-2); }
 
 .noticeLine {
   display: flex;
@@ -119,7 +119,7 @@
   line-height: 1.6;
 }
 .logLine { display: flex; gap: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.logTime { color: var(--ink-3); flex: none; }
+.logTime { color: var(--ink-2); flex: none; }
 .logOk .logText { color: var(--positive); }
 .logWarn .logText { color: var(--warn); }
 .logError .logText { color: var(--negative); }
@@ -146,7 +146,7 @@
 }
 .errorTitle { font-size: var(--text-2xl); font-weight: 700; line-height: var(--lh-tight); }
 .errorBody { font-size: 16px; color: var(--ink-2); }
-.errorRefunded { font-size: 14px; color: var(--ink-3); }
+.errorRefunded { font-size: 14px; color: var(--ink-2); }
 .errorActions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .detailBlock {
   background: var(--surface-sunk);

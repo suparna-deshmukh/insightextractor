@@ -32,7 +32,7 @@
   border-radius: var(--r-lg);
 }
 .panelSection { padding: 20px 24px; }
-.panelSection + .panelSection { border-top: 1px solid var(--line); }
+.panelSection + .panelSection { border-top: 1px solid var(--line-subtle); }
 @media (max-width: 640px) {
   .page { padding: 16px; }
   .panelSection { padding: 16px; }
@@ -43,7 +43,7 @@
   line-height: var(--lh-prose);
   min-height: 120px;
 }
-.helperWarn { font-size: var(--text-sm); color: var(--ink-3); margin-top: 8px; }
+.helperWarn { font-size: var(--text-sm); color: var(--warn); margin-top: 8px; }
 .helperOk { font-size: var(--text-sm); color: var(--positive); margin-top: 8px; }
 .fieldError {
   display: flex;
@@ -65,7 +65,7 @@
 @media (max-width: 640px) {
   .settingsRow { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
-.basedOn { font-size: 14px; color: var(--ink-3); margin-top: 10px; }
+.basedOn { font-size: 14px; color: var(--ink-2); margin-top: 10px; }
 .textBtn {
   border: none;
   background: none;
@@ -90,7 +90,7 @@
   .footerRow { flex-direction: column; align-items: stretch; }
   .startBtn { width: 100%; }
 }
-.estimate { font-size: 14px; color: var(--ink-3); }
+.estimate { font-size: 14px; color: var(--ink-2); }
 .limitLine { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); }
 .startBtn { flex: none; }
 
@@ -113,7 +113,7 @@
 .popTitle { font-size: 16px; font-weight: 600; color: var(--ink); }
 .popSub { font-size: 14px; color: var(--ink-2); }
 .popGroup { display: flex; flex-direction: column; gap: 8px; }
-.popGroupLabel { font-size: 14px; font-weight: 600; color: var(--ink-3); }
+.popGroupLabel { font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .popRows { display: flex; flex-direction: column; gap: 8px; }
 .srcRow {
   display: flex;
@@ -128,13 +128,13 @@
   text-align: left;
   transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
 }
-.srcRow:hover { background: var(--surface-sunk); }
+.srcRow:hover { background: var(--bg-hover); }
 .srcRowOn { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
 .srcText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .srcTitle { font-size: 16px; font-weight: 600; color: var(--ink); }
 .srcDesc { font-size: 14px; color: var(--ink-2); }
 .srcWarn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--warn); margin-top: 4px; }
-.srcKeyNote { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+.srcKeyNote { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink-2); margin-top: 6px; }
 .keyRow { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .keyInput { max-width: 240px; height: 36px; }
 .addKeyBtn { align-self: flex-start; }
@@ -147,7 +147,7 @@
   gap: 12px;
   margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-subtle);
   position: sticky;
   bottom: 0;
   background: var(--surface);
@@ -162,7 +162,7 @@
   .ftFull { grid-column: 1 / -1; }
 }
 .ftGroup { display: flex; flex-direction: column; gap: 8px; }
-.ftHeading { font-size: 14px; font-weight: 600; color: var(--ink-3); }
+.ftHeading { font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .ftTwo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 640px) {
   .ftTwo { grid-template-columns: 1fr; gap: 12px; }
@@ -184,9 +184,9 @@
   cursor: pointer;
   text-align: left;
 }
-.exampleRow:hover { background: var(--surface-sunk); }
+.exampleRow:hover { background: var(--bg-hover); }
 .exampleText { font-size: 16px; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.exampleGoal { font-size: 14px; color: var(--ink-3); flex: none; }
+.exampleGoal { font-size: 14px; color: var(--ink-2); flex: none; }
 
 .recent { margin-top: 32px; }
 .recentRows { list-style: none; margin: 0; padding: 0; }
@@ -197,13 +197,13 @@
   gap: 16px;
   width: 100%;
   padding: 12px 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-subtle);
   text-decoration: none;
   color: inherit;
 }
-.recentRow:hover { background: var(--surface-sunk); }
+.recentRow:hover { background: var(--bg-hover); }
 .recentTitle { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recentMeta { font-size: 14px; color: var(--ink-3); flex: none; }
+.recentMeta { font-size: 14px; color: var(--ink-2); flex: none; }
 
 .sampleLinkRow { margin-top: 24px; }
 .sampleLink { font-size: 15px; }
