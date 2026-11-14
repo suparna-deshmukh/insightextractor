@@ -1,23 +1,22 @@
-# Insight Extractor — Agentic User Insight Engine
+# Insight Extractor
 
-**Insight Extractor** (project dir: `insightextractor`): type a topic, describe it, pick the platforms —
-and an agent plans the research with Gemini, taps live platform APIs in parallel, cleans + buckets
-the signal with LLM + SQL, and hands a product manager a fixed-format **User Insights Report**.
+Type one question. Insight Extractor reads what real people say about it on public sites,
+groups it into themes, and hands you a clear report with real quotes as proof.
 
-Built for real PMs: problem discovery, product validation, post-launch feedback, competitor
-teardowns, feature prioritization.
+Built for product decisions: problem discovery, product validation, post-launch feedback,
+competitor comparisons, feature prioritization.
 
 ## System design
 
 ```
- Studio (browser)                    server (Next.js 15 routes)
- ┌──────────────────┐   POST /run   ┌────────────────────────────────────────────┐
- │ topic + brief +  │ ────────────► │ agent loop: Gemini plans source batches →  │
- │ platform picks   │               │ parallel fetchers (Hacker News, Reddit,    │
- │ mode (rapid/     │               │ App Store, Play Store, GitHub, Google      │
- │   standard/      │               │ Trends, Product Hunt, YouTube)             │
- │   raw-data)      │               │  → clean + dedupe (SQL)                     │
- └──────────────────┘               │  → LLM bucketing (4 insight buckets)       │
+ App (browser)                       server (Next.js 15 routes)
+ ┌──────────────────┐  POST /api/   ┌────────────────────────────────────────────┐
+ │ question +       │  agent/step   │ agent loop: Gemini plans source batches →  │
+ │ optional settings│ ────────────► │ parallel fetchers (Hacker News, Reddit,    │
+ │ (sources, time,  │               │ App Store, Play Store, GitHub, Google      │
+ │  depth, fine-    │               │ Trends, Product Hunt, YouTube)             │
+ │  tune)           │               │  → clean + dedupe (SQL)                     │
+ └──────────────────┘               │  → LLM bucketing (4 insight themes)       │
        ▲                            │  → fixed-format User Insights Report       │
        │ report + artifacts         └───────────────┬────────────────────────────┘
                                                     │
@@ -45,9 +44,13 @@ teardowns, feature prioritization.
 cd insightextractor
 npm install
 npm run dev          # http://localhost:3001
+npm test             # vitest suite for the client logic
+npm run typecheck    # tsc --noEmit
+npm run lint         # banned-pattern checks
+npm run build        # production build (then npm start)
 ```
 
-Keys live in `.env.local` (or paste them in the ⚙ settings modal in the UI — they persist to
+Keys live in `.env.local` (or paste them in Settings in the UI — they persist to
 `.env.local` + server memory and are never returned to the client).
 
 ```env
@@ -62,32 +65,40 @@ RUN_WINDOW_HOURS=5            # window length (ChatGPT-style, auto-refreshes)
 # YOUTUBE_API_KEY=            # optional
 ```
 
-## The 4-step wizard
+## The app
 
-1. **Topic** — topic name, detailed description (the agent plans from this text), objective,
-   competitors, industry + audience dropdowns, and dynamic follow-ups: mobile-app topics get an
-   "app names to mine" input (verified against live store searches at fetch time), brand/SaaS
-   topics get a "brand / product line" input.
-2. **Platforms** — searchable multi-select over 8 live sources (Hacker News, Reddit, App Store,
-   Play Store, GitHub, Google Autocomplete, Product Hunt, YouTube). Global time frame +
-   **per-platform time-frame overrides**, and **per-platform API key fields** for keyed sources.
-   Every platform shows its live provider fallback ladder with success/failure counts.
-3. **Refine & output** — extra keywords, focus-area chips, competitor-comparison toggle,
-   **5 output formats** (PM One-Pager, Executive Brief, Full Research Report, Data-First,
-   Raw Data — the CSV of raw relevant insights is the artifact; the report LLM call is skipped),
-   **2 analysis pipelines** (Rapid Scan / Deep Dive), 3 report lengths, 3 tones.
-4. **Review & run** — every input shown with edit links, live Gemini-budget + run-window readout,
-   then 🚀 Run.
+One screen, one question. Everything else is optional, and can be changed later from a saved
+research ("Edit and run again" prefills it).
 
-Live run view: 6-stage tracker, agent console with per-provider log lines, per-platform intake
-chips, and result tabs (Report / Buckets / Evidence / SQL Audit) with `.md`, `.json`, `.csv`
-exports (Raw Data runs additionally export the raw relevant insights as a `.csv`).
+```
+/             Home — ask a question, start the research (?from={id} prefills from a past run)
+/research/id  One page, four states: running, error, results (plus a not-found state)
+/library      Your research — date groups, search, rename, remove with undo
+/settings     AI key, usage, optional connections, appearance, data, source status
+/sample       The results page rendered from built-in sample data (clearly marked)
+/dev/ui       Component gallery — development only, 404 in production
+```
 
-## History (per user)
-
-Every completed run is stored **per user** (a stable client id in `localStorage`, scoped server-side).
-The wizard shows a History section — click any run to reopen its full report, buckets, evidence
-and SQL audit. On Vercel the filesystem is ephemeral, so history/ledgers persist per instance.
+- **Home** — the question, an optional "What is this research for?" choice, and three optional
+  settings: **Where to look** (eight public sources, with automatic picks for app-related
+  questions), **How far back** (time window) and **How thorough** (Quick scan or Deep dive).
+  Fine-tune adds goal-specific fields (app names, competitors, keywords, report style). Two
+  interactions get a result going: type the question, press Start research.
+- **Running** — a plain-language step list that ticks as the work happens, with a status line.
+  The full technical log is opt-in under "Show details". Cancel asks once; if confirmed, the
+  research does not count against your limit. A refresh lands back on the same running research.
+- **Results** — "The short version" first, then themes with real quotes and source links. The
+  Insights tab holds the full report, a trend over the chosen window and per-theme detail; the
+  Evidence tab lists the posts with filters (theme, source, feeling), search with highlighting,
+  sorting and 50-row paging. "How was this made?" opens a drawer with the source table and, for
+  analysts, the SQL. Export as `.md`, `.json` or `.csv` (spreadsheet-ready styles included).
+- **Your research (library)** — every finished research in date groups (Today, Yesterday,
+  Last 7 days, Last 30 days, Older), searchable, renamable in place, removable with a 7-second
+  Undo. Stored in this browser only; the page says so.
+- **Settings** — the Google AI key (plus two backup keys) with an explicit Save and a visible
+  "Saved" confirmation, optional Product Hunt and YouTube keys, a usage meter with a live
+  countdown to the next opening research, appearance (light / dark / match device), a plain
+  data section, and source status under Advanced.
 
 ## Gemini call budget (free tier: 20 req/day per key)
 
@@ -127,8 +138,8 @@ retried as primary again. A 503 "high demand" moves to the next **model on the s
 
 Every Gemini request this platform makes is recorded in the shared ledger (per key, per UTC
 day). There is no "usage" API on the free tier, so the count is our own (every outbound request
-counts) and is cross-checked by server quota signals. The top bar shows
-`used/total shared gemini calls today`; ⚙ shows the per-key table with 20/20 + exhausted status.
+counts) and is cross-checked by server quota signals. Per-key usage (e.g. 20/20, exhausted)
+is shown in Settings › AI connection; the sidebar meter shows researches left in the window.
 
 ### Shared state (localhost + Vercel)
 
@@ -148,9 +159,9 @@ Vercel they are per-instance and reset on redeploy.
 
 ### Per-user run window
 
-Each user gets `RUNS_PER_WINDOW` agent runs per rolling `RUN_WINDOW_HOURS` window (default
-5 runs / 5 h), displayed in the top bar and auto-refreshing — the same pattern as ChatGPT/Claude.
-The limit counts **runs**, not volume.
+Each user gets `RUNS_PER_WINDOW` researches per rolling `RUN_WINDOW_HOURS` window (default
+5 / 5 h), shown as a meter in the sidebar with a live countdown — the same pattern as
+ChatGPT/Claude. The limit counts **researches**, not volume.
 
 ## Pipeline (server)
 
@@ -180,7 +191,7 @@ SQL analysis → Synthesize report`
 ## Vercel notes
 
 - Filesystem is ephemeral: health ledger, usage ledger, run window and history are per-instance
-  (reset on redeploy). Keys set via ⚙ are per-instance too — set them as Vercel env vars for
+  (reset on redeploy). Keys set via the Settings page are per-instance too — set them as Vercel env vars for
   durability.
-- `Deep Dive` runs can take 3–6 min; on the Hobby plan, long SSE streams may hit function
-  duration limits — Rapid Scan is the safer default.
+- Deep dive researches can take 3–6 min; on the Hobby plan, long streams may hit function
+  duration limits — quick scan is the safer default.
