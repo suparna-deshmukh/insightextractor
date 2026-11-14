@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, TriangleAlert } from 'lucide-react';
 import { copy } from '@/lib/copy';
 import type { SourceId } from '@/lib/client/types';
@@ -44,6 +44,10 @@ export function SourcesPopover({
   const [keyValue, setKeyValue] = useState('');
   const [keySaved, setKeySaved] = useState<SourceId | null>(null);
   const [keyError, setKeyError] = useState('');
+  const keySavedTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (keySavedTimer.current) window.clearTimeout(keySavedTimer.current);
+  }, []);
 
   const hasKey = (env: string) => Boolean(health?.sources.find((s) => s.providers.some((p) => p.requiresKey === env && p.keySet)));
   const isTroubled = (id: SourceId) => {
@@ -75,7 +79,8 @@ export function SourcesPopover({
       revalidateAfterRun();
       setKeyEditing(null);
       setKeyValue('');
-      window.setTimeout(() => setKeySaved(null), 2000);
+      if (keySavedTimer.current) window.clearTimeout(keySavedTimer.current);
+      keySavedTimer.current = window.setTimeout(() => setKeySaved(null), 2000);
     } else {
       setKeyError(copy.settings.key.failed);
     }
