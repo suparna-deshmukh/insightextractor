@@ -14,7 +14,10 @@
   top: 16px;
 }
 
-.layout { display: flex; min-height: 100dvh; }
+.layout { display: flex; flex-direction: column; min-height: 100dvh; }
+@media (min-width: 900px) {
+  .layout { flex-direction: row; }
+}
 .main { flex: 1; min-width: 0; }
 
 .desktopSidebar { display: none; }

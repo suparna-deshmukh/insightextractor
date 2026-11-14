@@ -85,7 +85,7 @@ export function InsightsTab({
   }, [sections, result, fresh, onSeeAll, keywords]);
 
   return (
-    <div className="results-layout">
+    <div className={`${styles.layout} results-layout`}>
       <div className={styles.mainCol}>
         {ordered.map((sec, i) => (
           <Section key={sec.id} id={sec.id} heading={sec.heading} first={i === 0}>
