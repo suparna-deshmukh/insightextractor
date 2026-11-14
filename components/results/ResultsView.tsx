@@ -44,9 +44,11 @@ export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnl
   useDocumentTitle(`${titleFor({ id: run.id, topic: result.topic })} · ${copy.app.name}`);
 
   const sections = useMemo(() => parseReport(result.report), [result.report]);
-  // PLAN-NOTE: "empty or only a stub" has no exact server contract; treat a report with
-  // no substantive section (over 200 chars of markdown) as a stub.
-  const sheetOnly = Boolean(result.rawCsv) && !sections.some((s) => s.md.length > 200);
+  // PLAN-NOTE: the plan's "report is empty or only a stub" has no exact server contract,
+  // and the raw-data report is a non-empty DATA NOTE (lib/report.ts), so a stub check can
+  // never match. rawCsv is populated only when request.format === 'raw-data'
+  // (lib/pipeline.ts), which is the precise spreadsheet-only signal.
+  const sheetOnly = Boolean(result.rawCsv);
 
   const tab: 'insights' | 'evidence' = sp.get('tab') === 'evidence' ? 'evidence' : 'insights';
   const setTab = (t: 'insights' | 'evidence') => {

@@ -90,11 +90,29 @@ function OtherKeys() {
   );
 }
 
+function AppearanceSection() {
+  const { mode, setMode } = useTheme();
+  return (
+    <section className={styles.section}>
+      <h2>{copy.settings.appearance.title}</h2>
+      <ToggleGroup<ThemeMode>
+        ariaLabel={copy.settings.appearance.title}
+        options={[
+          { value: 'system', label: copy.settings.appearance.system },
+          { value: 'light', label: copy.settings.appearance.light },
+          { value: 'dark', label: copy.settings.appearance.dark },
+        ]}
+        value={mode}
+        onValueChange={(v) => setMode(v as ThemeMode)}
+      />
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const toast = useToast();
   const { data: settings } = useSWR('/api/settings', fetchSettings, { shouldRetryOnError: false });
   const { data: health } = useHealth();
-  const { mode, setMode } = useTheme();
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
   const masked = (env: string) => settings?.keys.find((k) => k.key === env)?.masked;
@@ -133,19 +151,7 @@ export default function SettingsPage() {
           <UsageBlock health={health ?? null} />
         </section>
 
-        <section className={styles.section}>
-          <h2>{copy.settings.appearance.title}</h2>
-          <ToggleGroup<ThemeMode>
-            ariaLabel={copy.settings.appearance.title}
-            options={[
-              { value: 'system', label: copy.settings.appearance.system },
-              { value: 'light', label: copy.settings.appearance.light },
-              { value: 'dark', label: copy.settings.appearance.dark },
-            ]}
-            value={mode}
-            onValueChange={(v) => setMode(v as ThemeMode)}
-          />
-        </section>
+        <AppearanceSection />
 
         <section className={styles.section}>
           <h2>{copy.settings.data.title}</h2>
