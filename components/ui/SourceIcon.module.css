@@ -4,6 +4,6 @@
   justify-content: center;
   border-radius: var(--r-md);
   background: var(--surface-sunk);
-  color: var(--ink);
+  color: var(--ink-2);
   flex: none;
 }

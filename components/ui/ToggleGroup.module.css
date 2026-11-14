@@ -3,7 +3,7 @@
   height: 36px;
   padding: 0 14px;
   border-radius: var(--r-full);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
   font-size: 15px;
@@ -11,7 +11,7 @@
   cursor: pointer;
   transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.item:hover:not(:disabled) { background: var(--surface-sunk); }
+.item:hover:not(:disabled) { background: var(--bg-hover); }
 .item[data-state='on'] {
   background: var(--action);
   border-color: var(--action);

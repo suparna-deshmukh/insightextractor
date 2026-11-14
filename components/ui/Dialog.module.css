@@ -11,7 +11,7 @@
   transform: translate(-50%, -50%);
   z-index: var(--z-drawer);
   width: min(420px, calc(100vw - 32px));
-  background: var(--surface);
+  background: var(--bg-elevated);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
   padding: 24px;

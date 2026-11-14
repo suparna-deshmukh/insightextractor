@@ -10,7 +10,7 @@
   right: 0;
   bottom: 0;
   z-index: var(--z-drawer);
-  background: var(--surface);
+  background: var(--bg-elevated);
   border-left: 1px solid var(--line);
   box-shadow: var(--shadow-drawer);
   display: flex;

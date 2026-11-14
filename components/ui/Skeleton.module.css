@@ -2,4 +2,9 @@
   display: inline-block;
   border-radius: var(--r-sm);
   background: var(--surface-sunk);
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%, 100% { background: var(--bg-surface); }
+  50% { background: var(--bg-elevated); }
 }

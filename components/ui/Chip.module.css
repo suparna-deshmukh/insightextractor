@@ -6,7 +6,7 @@
   padding: 0 10px;
   border-radius: var(--r-full);
   background: var(--surface-sunk);
-  color: var(--ink);
+  color: var(--ink-2);
   font-size: 14px;
 }
 .label { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -22,7 +22,7 @@
   color: var(--ink-2);
   cursor: pointer;
 }
-.remove:hover { color: var(--ink); background: var(--line); }
+.remove:hover { color: var(--ink); background: var(--bg-hover); }
 @media (max-width: 640px) {
   .remove { width: 28px; height: 28px; }
 }

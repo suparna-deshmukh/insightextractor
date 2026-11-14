@@ -1,4 +1,4 @@
 .meter { display: inline-flex; gap: 4px; }
 .filled, .emptySeg { width: 16px; height: 6px; border-radius: 3px; }
 .filled { background: var(--ink); }
-.emptySeg { background: var(--line-strong); }
+.emptySeg { background: var(--line); }

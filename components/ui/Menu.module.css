@@ -1,6 +1,6 @@
 .menu {
   min-width: 220px;
-  background: var(--surface);
+  background: var(--bg-elevated);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
@@ -19,7 +19,7 @@
   cursor: pointer;
   user-select: none;
 }
-.item[data-highlighted] { background: var(--surface-sunk); }
+.item[data-highlighted] { background: var(--bg-hover); }
 .icon { display: inline-flex; color: var(--ink-2); }
 .icon svg { width: 16px; height: 16px; }
 .label { flex: 1; }

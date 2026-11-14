@@ -13,7 +13,7 @@
 .chev, .chevOpen { flex: none; color: var(--ink-2); transition: transform var(--dur-2) var(--ease); }
 .chevOpen { transform: rotate(90deg); }
 .title { font-size: 16px; font-weight: 600; }
-.sub { font-size: 14px; color: var(--ink-3); }
+.sub { font-size: 14px; color: var(--ink-2); }
 .content {
   display: grid;
   grid-template-rows: 0fr;

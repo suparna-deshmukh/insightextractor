@@ -41,4 +41,4 @@
   color: var(--ink-3);
   cursor: pointer;
 }
-.dismiss:hover { color: var(--ink); background: var(--line); }
+.dismiss:hover { color: var(--ink); background: var(--bg-hover); }

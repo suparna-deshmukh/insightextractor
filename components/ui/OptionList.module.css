@@ -7,15 +7,14 @@
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: transparent;
   cursor: pointer;
   transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-.row:hover { background: var(--surface-sunk); }
+.row:hover { background: var(--bg-hover); }
 .row[data-state='checked'] {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
-  background: var(--surface);
+  border-color: var(--action);
+  background: var(--action);
 }
 .dot {
   flex: none;
@@ -27,7 +26,7 @@
   display: grid;
   place-items: center;
 }
-.row[data-state='checked'] .dot { border-color: var(--ink); }
+.row[data-state='checked'] .dot { border-color: var(--ink-on-action); }
 .dotFill {
   width: 10px;
   height: 10px;
@@ -40,3 +39,6 @@
 .desc { font-size: 14px; color: var(--ink-2); }
 .check { flex: none; margin-top: 2px; color: var(--ink); display: none; }
 .row[data-state='checked'] .check { display: inline-flex; }
+.row[data-state='checked'] .title { color: var(--ink-on-action); }
+.row[data-state='checked'] .desc { color: var(--ink-on-action); opacity: 0.72; }
+.row[data-state='checked'] .dotFill { background: var(--ink-on-action); }
