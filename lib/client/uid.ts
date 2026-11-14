@@ -1,5 +1,5 @@
-// Same id as the old Studio used, so run history and the rolling window
-// carry over to the new UI.
+// Same id as the pre-redesign interface used, so run history and the rolling
+// window carry over.
 export function getUid(): string {
   try {
     let u = localStorage.getItem('insight_extractor_uid') || localStorage.getItem('askcard_uid') || '';

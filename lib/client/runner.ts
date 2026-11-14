@@ -27,7 +27,7 @@ export async function refund(token: string): Promise<void> {
 }
 
 /**
- * The run loop, extracted from the old Studio. Behaviour is unchanged:
+ * The run loop, extracted from the pre-redesign interface. Behaviour is unchanged:
  * one POST per stage, resume after a stream drop (max 3), model-retry cap of 6,
  * refund on fatal failure. `signal` stops everything and sends nothing further.
  */
