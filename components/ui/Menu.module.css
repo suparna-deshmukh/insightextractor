@@ -1,0 +1,27 @@
+.menu {
+  min-width: 220px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 6px;
+  z-index: var(--z-pop);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+.item[data-highlighted] { background: var(--bg-hover); }
+.icon { display: inline-flex; color: var(--ink-2); }
+.icon svg { width: 16px; height: 16px; }
+.label { flex: 1; }
+.destructive { color: var(--negative); }
+.destructive .icon { color: var(--negative); }

@@ -1,0 +1,53 @@
+.prose { font-size: var(--text-md); line-height: var(--lh-prose); color: var(--ink); max-width: 66ch; }
+.prose > * + * { margin-top: 16px; }
+.prose p { margin: 0; }
+.prose h3 { margin: 32px 0 0; font-size: var(--text-lg); font-weight: 600; line-height: var(--lh-snug); }
+.prose hr { border: none; border-top: 1px solid var(--line-subtle); margin: 32px 0; }
+.prose code { font-family: var(--font-mono); font-size: 0.875em; background: var(--surface-sunk); padding: 2px 6px; border-radius: var(--r-sm); }
+.prose ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prose ul li { position: relative; padding-left: 20px; }
+.prose ul li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0.65em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.prose ol { list-style: none; counter-reset: rank; margin: 0; padding: 0; display: grid; gap: 12px; }
+.prose ol li { counter-increment: rank; display: grid; grid-template-columns: 28px 1fr; column-gap: 12px; align-items: baseline; }
+.prose ol li::before { content: counter(rank); font-size: var(--text-xl); font-weight: 600; color: var(--ink-3); }
+.tableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
+.prose table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 15px; }
+.prose th {
+  background: var(--surface-sunk);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 12px;
+}
+.prose td { padding: 10px 12px; border-top: 1px solid var(--line-subtle); }
+.prose tbody tr:first-child td { border-top: none; }
+.prose tbody tr:last-child td { border-top: none; }
+.prose a { color: var(--accent); }
+.quote { margin: 20px 0; padding-left: 20px; border-left: 3px solid var(--ink); }
+.quote blockquote {
+  margin: 0;
+  font-family: var(--font-voice);
+  font-size: 1.375rem;
+  line-height: 1.5;
+  color: var(--ink);
+  font-style: normal;
+}
+.quote figcaption { margin-top: 8px; font-size: var(--text-sm); color: var(--ink-2); font-family: var(--font-ui); }
+
+.lead { font-size: var(--text-lg); font-weight: 500; }
+.swipe {
+  background: var(--mark-soft) left / 0% 100% no-repeat;
+  animation: lead-swipe 600ms var(--ease) 200ms forwards;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@keyframes lead-swipe { to { background-size: 100% 100%; } }

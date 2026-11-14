@@ -1,0 +1,47 @@
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-ui); font-size: var(--text-base); line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: var(--lh-snug); text-wrap: balance; letter-spacing: -0.01em; }
+p { margin: 0; text-wrap: pretty; }
+a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--ink); }
+button { font: inherit; color: inherit; }
+input, textarea, select { font: inherit; color: inherit; color-scheme: dark; }
+
+/* Interactive elements: one consistent 150ms ease on colour and shadow.
+   (prefers-reduced-motion zeroes all transition durations below.) */
+a, button, input, select, textarea,
+[role='button'], [role='radio'], [role='checkbox'], [role='switch'],
+[role='tab'], [role='menuitem'], [role='option'], [tabindex] {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Scrollbars: thin, token-tinted */
+* { scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: var(--r-full); border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: content-box; }
+
+::selection { background: var(--accent-soft); color: var(--text-primary); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+mark, .mark { background: var(--mark-soft); color: inherit; border-radius: 3px; padding: 0 0.15em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .results-layout { grid-template-columns: 1fr !important; }
+  a[href^='http']::after { content: ' (' attr(href) ')'; font-size: 0.75em; word-break: break-all; }
+}
+
+.sample-banner { max-width: var(--wide-max); margin: 0 auto; padding: 24px 24px 0; }
+
+.sample-skeleton { max-width: var(--content-max); margin: 0 auto; padding: 24px; display: grid; gap: 12px; }

@@ -1,0 +1,28 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  background: var(--surface-sunk);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.label { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.remove:hover { color: var(--ink); background: var(--bg-hover); }
+@media (max-width: 640px) {
+  .remove { width: 28px; height: 28px; }
+}

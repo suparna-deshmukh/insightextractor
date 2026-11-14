@@ -1,0 +1,21 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: var(--z-drawer);
+}
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-drawer);
+  width: min(420px, calc(100vw - 32px));
+  background: var(--bg-elevated);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 24px;
+}
+.title { font-size: 20px; font-weight: 600; color: var(--ink); line-height: var(--lh-snug); }
+.body { font-size: 16px; color: var(--ink-2); margin-top: 8px; }
+.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; flex-wrap: wrap; }

@@ -1,0 +1,128 @@
+:root {
+  color-scheme: dark;
+
+  /* ===== Deep-black theme — core tokens (single source of truth) ===== */
+
+  /* Surfaces (elevation = lighter) */
+  --bg-base: #000000;
+  --bg-sidebar: #0A0A0A;
+  --bg-surface: #111111;
+  --bg-elevated: #171717;
+  --bg-hover: #1F1F1F;
+  --bg-active: #262626;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Borders */
+  --border-subtle: #1F1F1F;
+  --border-default: #2A2A2A;
+  --border-strong: #3A3A3A;
+
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-secondary: #A1A1A1;
+  --text-tertiary: #6B6B6B;
+  --text-inverse: #000000;
+
+  /* Accent */
+  --accent: #FACC15;
+  --accent-text: #000000;
+  --accent-soft: rgba(250, 204, 21, 0.12);
+  --focus-ring: rgba(250, 204, 21, 0.5);
+
+  /* Status (muted, readable on black) */
+  --success: #4ADE80;   --success-soft: rgba(74, 222, 128, 0.12);
+  --warning: #FBBF24;   --warning-soft: rgba(251, 191, 36, 0.12);
+  --danger: #F87171;    --danger-soft: rgba(248, 113, 113, 0.12);
+  --danger-soft-strong: rgba(248, 113, 113, 0.2);
+  --info: #60A5FA;      --info-soft: rgba(96, 165, 250, 0.12);
+
+  /* Data-visualisation palette — use in this order, on every screen */
+  --chart-1: #FACC15;
+  --chart-2: #60A5FA;
+  --chart-3: #4ADE80;
+  --chart-4: #F472B6;
+  --chart-5: #A78BFA;
+  --chart-6: #FB923C;
+
+  /* White action scale (primary buttons, selected states) */
+  --white: #FFFFFF;
+  --white-hover: #E5E5E5;
+  --white-active: #D4D4D4;
+
+  /* ===== Legacy names (compatibility) — all alias the core tokens above ===== */
+  --paper: var(--bg-base);
+  --surface: var(--bg-surface);
+  --surface-sunk: var(--bg-elevated);
+  --ink: var(--text-primary);
+  --ink-2: var(--text-secondary);
+  --ink-3: var(--text-tertiary);
+  --ink-on-action: var(--text-inverse);
+  --line: var(--border-default);
+  --line-strong: var(--border-strong);
+  --line-subtle: var(--border-subtle);
+  --action: var(--white);
+  --action-hover: var(--white-hover);
+  --action-active: var(--white-active);
+  --mark: var(--accent);
+  --mark-soft: var(--accent-soft);
+  --positive: var(--success);
+  --positive-bg: var(--success-soft);
+  --negative: var(--danger);
+  --negative-bg: var(--danger-soft);
+  --request: var(--info);
+  --request-bg: var(--info-soft);
+  --neutral: var(--text-secondary);
+  --neutral-bg: var(--bg-elevated);
+  --warn: var(--warning);
+  --warn-bg: var(--warning-soft);
+  --scrim: var(--bg-overlay);
+
+  /* Type */
+  --font-ui: var(--font-figtree), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-voice: var(--font-source-serif), 'Iowan Old Style', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;     /* 12: timestamps in dense tables only */
+  --text-sm: 0.875rem;    /* 14: helper text, labels, meta */
+  --text-base: 1rem;      /* 16: UI body */
+  --text-md: 1.125rem;    /* 18: report body, main text area */
+  --text-lg: 1.25rem;     /* 20: card titles, quotes in lists */
+  --text-xl: 1.5rem;      /* 24: section headings */
+  --text-2xl: 1.875rem;   /* 30: page titles */
+  --text-3xl: clamp(2rem, 1.4rem + 2vw, 2.75rem);  /* Home heading */
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-body: 1.55;
+  --lh-prose: 1.65;
+
+  /* Space (4px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+
+  /* Radius tiers (different levels get different radii) */
+  --r-sm: 6px;      /* badges, small chips, menu items */
+  --r-md: 10px;     /* buttons, inputs, option rows */
+  --r-lg: 16px;     /* panels, popovers, dialogs, drawers */
+  --r-full: 999px;  /* pills and toggle groups only */
+
+  /* Elevation (only floating things get a shadow) */
+  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-pop: var(--shadow-floating);
+  --shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.6);
+  --shadow-drawer-left: 8px 0 32px rgba(0, 0, 0, 0.6);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 150ms;  --dur-2: 200ms;  --dur-3: 400ms;
+
+  /* Layout */
+  --sidebar-w: 264px;
+  --content-max: 760px;
+  --wide-max: 1080px;
+  --rail-w: 200px;
+  --topbar-h: 56px;
+
+  /* Layers */
+  --z-sticky: 10; --z-drawer: 40; --z-pop: 50; --z-toast: 60;
+}

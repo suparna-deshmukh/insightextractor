@@ -1,0 +1,8 @@
+.panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 8px;
+  z-index: var(--z-pop);
+}

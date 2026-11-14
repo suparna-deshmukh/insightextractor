@@ -1,0 +1,11 @@
+.tooltip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  z-index: var(--z-toast);
+  max-width: 260px;
+}

@@ -1,0 +1,68 @@
+.page { max-width: var(--wide-max); margin: 0 auto; padding: 24px 24px 96px; }
+@media (max-width: 640px) {
+  .page { padding: 16px 16px 64px; }
+}
+.header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+.h1 { font-size: var(--text-2xl); font-weight: 600; letter-spacing: -0.02em; }
+.newBtn { display: none; }
+@media (max-width: 899px) {
+  .newBtn { display: inline-flex; }
+}
+
+.searchRow { position: relative; margin-bottom: 20px; max-width: 480px; }
+.searchIcon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.searchInput {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px 10px 38px;
+}
+.searchInput::placeholder { color: var(--ink-3); }
+
+.skeletonList { display: grid; gap: 20px; max-width: var(--content-max); }
+.skRow { display: grid; gap: 8px; padding: 12px 0; }
+
+.group { margin-bottom: 24px; }
+.groupHeading { margin: 0 0 4px; font-size: var(--text-sm); font-weight: 600; color: var(--ink-2); }
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 12px 8px;
+  border-top: 1px solid var(--line-subtle);
+}
+.group .row:last-child { border-bottom: 1px solid var(--line-subtle); }
+.row:hover { background: var(--bg-hover); }
+.stretch { position: absolute; inset: 0; }
+.rowMain { position: relative; min-width: 0; flex: 1; }
+.title {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sub { margin: 2px 0 0; font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rowMeta { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; }
+.menuWrap { position: relative; z-index: 1; }
+.renameInput {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  width: 100%;
+  max-width: 420px;
+}
+.footnote { margin-top: 24px; font-size: var(--text-sm); color: var(--ink-2); max-width: 60ch; }

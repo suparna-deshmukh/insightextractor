@@ -1,14 +1,30 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata, Viewport } from 'next';
+import { Figtree, Source_Serif_4 } from 'next/font/google';
+import '@/styles/tokens.css';
+import '@/styles/base.css';
+
+const figtree = Figtree({ subsets: ['latin'], variable: '--font-figtree', display: 'swap' });
+const sourceSerif = Source_Serif_4({ subsets: ['latin'], variable: '--font-source-serif', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Insight Extractor — Agentic User Insights for Product Managers',
-  description: 'Type a topic. The agent plans with Gemini, taps every platform you pick, buckets the signal with LLM + SQL, and delivers a fixed-format User Insights Report — on a strict shared 3-calls-per-run Gemini budget.',
+  title: { default: 'Insight Extractor', template: '%s · Insight Extractor' },
+  description: 'Describe what you want to understand. We read what real people say online and turn it into a clear report.',
 };
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
+const themeScript = `(function(){try{var t=localStorage.getItem('ie:theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${figtree.variable} ${sourceSerif.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

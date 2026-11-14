@@ -1,0 +1,13 @@
+.page { max-width: 1080px; margin: 0 auto; padding: 24px; }
+.pageTitle { font-size: var(--text-2xl); }
+.pageSub { color: var(--ink-2); margin: 8px 0 24px; }
+.section { margin-bottom: 48px; }
+.sectionTitle { font-size: var(--text-xl); margin-bottom: 16px; }
+.rowWrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.col480 { display: grid; gap: 16px; max-width: 480px; }
+.colAuto { display: grid; gap: 16px; }
+.stack12 { display: grid; gap: 12px; }
+.logLine { font-family: var(--font-mono); font-size: 13px; padding: 12px 0; }
+.pad8 { padding: 8px; }
+.meterNote { font-size: 14px; color: var(--ink-2); margin-top: 8px; }
+.wideNote { max-width: 520px; }

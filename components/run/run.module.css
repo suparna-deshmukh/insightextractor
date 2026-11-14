@@ -1,0 +1,166 @@
+.wrap {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 24px;
+}
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: var(--lh-tight);
+}
+.sub {
+  font-size: 15px;
+  color: var(--ink-2);
+  margin-top: 8px;
+}
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+.progressRow .track { flex: 1; }
+.stepLabel { font-size: 14px; color: var(--ink-2); flex: none; }
+.elapsed { font-size: 14px; color: var(--ink-2); flex: none; }
+
+.stepList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.marker {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+.markerWaiting { border: 1.5px solid var(--line-strong); }
+.markerDone { background: var(--ink); color: var(--ink-on-action); }
+.markerActive {
+  border: 2px solid var(--mark);
+  display: grid;
+  place-items: center;
+}
+.stepLabelDone, .stepLabelWaiting { color: var(--ink); }
+.stepLabelWaiting { color: var(--ink-2); }
+.stepLabelActive { font-weight: 600; color: var(--ink); }
+.stepLabelFailed { color: var(--negative); }
+.markerFailed { color: var(--negative); display: grid; place-items: center; }
+
+.nested {
+  margin-left: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.srcRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.srcName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srcStatus { flex: none; color: var(--ink-2); }
+.srcStatusWarn { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); }
+.srcIconSm { flex: none; border-radius: 6px; }
+.summaryLine {
+  margin-left: 34px;
+  font-size: 14px;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  font-weight: 500;
+  text-align: left;
+}
+.summaryLine:hover { color: var(--ink); }
+.liveTotal { margin-left: 34px; font-size: 14px; color: var(--ink-2); }
+
+.noticeLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.logPanel {
+  margin-top: 16px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.logLine { display: flex; gap: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.logTime { color: var(--ink-2); flex: none; }
+.logOk .logText { color: var(--positive); }
+.logWarn .logText { color: var(--warn); }
+.logError .logText { color: var(--negative); }
+.logStage .logText { font-weight: 600; }
+.logHead { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+.errorWrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 64px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.errorIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-full);
+  background: var(--negative-bg);
+  color: var(--negative);
+  display: grid;
+  place-items: center;
+}
+.errorTitle { font-size: var(--text-2xl); font-weight: 700; line-height: var(--lh-tight); }
+.errorBody { font-size: 16px; color: var(--ink-2); }
+.errorRefunded { font-size: 14px; color: var(--ink-2); }
+.errorActions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.detailBlock {
+  background: var(--surface-sunk);
+  border-radius: var(--r-md);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.logToggle { margin-left: 0; display: flex; align-items: center; gap: 8px; }
+.chev { color: var(--ink-2); transition: transform var(--dur-2) var(--ease); }
+.chevOpen { color: var(--ink-2); transition: transform var(--dur-2) var(--ease); transform: rotate(90deg); }
+.detailWrap { display: grid; gap: 8px; align-items: start; padding-top: 8px; }
