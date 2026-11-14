@@ -3,7 +3,7 @@
   left: -9999px;
   top: 0;
   z-index: var(--z-toast);
-  background: var(--surface);
+  background: var(--bg-elevated);
   color: var(--ink);
   padding: 8px 16px;
   border-radius: var(--r-md);
@@ -26,8 +26,8 @@
     display: block;
     flex: none;
     width: var(--sidebar-w);
-    background: var(--surface-sunk);
-    border-right: 1px solid var(--line);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--line-subtle);
     position: sticky;
     top: 0;
     height: 100dvh;
@@ -44,7 +44,7 @@
   padding: 0 8px;
   padding-top: env(safe-area-inset-top);
   background: var(--paper);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-subtle);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -65,6 +65,8 @@
 .logoLink { display: inline-flex; text-decoration: none; }
 .logoRow { display: inline-flex; align-items: center; gap: 10px; }
 .wordmark { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.logoTile { fill: var(--accent); }
+.logoGlyph { fill: var(--text-inverse); }
 .mark { flex: none; }
 
 .newResearch {
@@ -90,16 +92,16 @@
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--r-md);
-  color: var(--ink);
+  color: var(--ink-2);
   font-size: 15px;
   text-decoration: none;
   transition: background-color var(--dur-1) var(--ease);
 }
-.navRow:hover { background: var(--line); }
-.navRowActive { background: var(--surface); border-color: var(--line); font-weight: 600; }
+.navRow:hover { background: var(--bg-hover); color: var(--ink); }
+.navRowActive { background: var(--bg-elevated); border-color: var(--line); color: var(--ink); font-weight: 600; }
 
 .recent { min-width: 0; }
-.recentLabel { font-size: 14px; font-weight: 600; color: var(--ink-3); margin-bottom: 4px; }
+.recentLabel { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }
 .recentList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .recentItem {
   display: block;
@@ -109,13 +111,13 @@
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   font-size: 14px;
-  color: var(--ink);
+  color: var(--ink-2);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.recentItem:hover { background: var(--line); }
+.recentItem:hover { background: var(--bg-hover); color: var(--ink); }
 .seeAll {
   display: inline-block;
   margin-top: 6px;
@@ -135,6 +137,6 @@
   padding: 8px;
   margin: 0 -8px;
 }
-.usageLink:hover { background: var(--line); }
+.usageLink:hover { background: var(--bg-hover); }
 .usageBlock { display: flex; flex-direction: column; gap: 8px; }
 .usageText { font-size: 14px; color: var(--ink-2); }
