@@ -1,13 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 import { getKey } from './keys';
-import { storeGetInt, storeIncr, storeSet, storeSetFlag } from './store';
+import { storeGetInt, storeIncr, storeSet, storeSetFlag, storeGet } from './store';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const FALLBACK_CHAIN = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class RetryableError extends Error {
+  status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; }
+}
+
+/** 401/403 from Google: the key itself is rejected. Retrying the same key
+ * cannot help — surface a fixable message instead of a 30-min cooldown. */
+export class AuthError extends Error {
   status: number;
   constructor(status: number, message: string) { super(message); this.status = status; }
 }
@@ -114,6 +121,21 @@ async function bumpUsage(name: string) {
   await storeIncr(usageKey(name), 1, ttlToDayEnd());
 }
 
+function authBadKey(name: string) { return `insight-extractor:authbad:${dayStamp()}:${name}`; }
+function authBadReason(name: string) { return `insight-extractor:authbadreason:${dayStamp()}:${name}`; }
+
+/** A 401/403 is permanent for the day — record the key + the Google reason. */
+async function markAuthBad(name: string, reason: string) {
+  await storeSet(authBadKey(name), '1', ttlToDayEnd());
+  await storeSet(authBadReason(name), reason.slice(0, 200), ttlToDayEnd());
+}
+
+async function authBadOf(name: string): Promise<string | null> {
+  if ((await storeGetInt(authBadKey(name))) <= 0) return null;
+  const r = await storeGet(authBadReason(name));
+  return r || 'rejected by Google';
+}
+
 /**
  * A quota failure means this key has fully spent its daily allocation:
  * record it as QUOTA/QUOTA (e.g. 20/20) and refuse it for the rest of the UTC day.
@@ -138,8 +160,17 @@ async function keyRemaining(name: string): Promise<number> {
   return Math.max(0, quota - (await storeGetInt(usageKey(name))));
 }
 
-export interface KeyUsageView { name: string; used: number; quota: number; exhausted: boolean; remaining: number; cooldownUntil: number | null }
-export interface GeminiUsageView { day: string; keys: KeyUsageView[]; totalUsed: number; totalQuota: number }
+export interface KeyUsageView {
+  name: string;
+  used: number;
+  quota: number;
+  exhausted: boolean;
+  remaining: number;
+  cooldownUntil: number | null;
+  status: 'ok' | 'exhausted' | 'cooldown' | 'invalid';
+  invalidReason?: string;
+}
+export interface GeminiUsageView { day: string; keys: KeyUsageView[]; totalUsed: number; totalQuota: number; ok: boolean }
 
 export async function geminiUsage(): Promise<GeminiUsageView> {
   const quota = dailyQuota();
@@ -148,15 +179,18 @@ export async function geminiUsage(): Promise<GeminiUsageView> {
     const used = await storeGetInt(usageKey(n));
     const exhausted = (await storeGetInt(exhaustKey(n))) > 0;
     const unwellUntil = await storeGetInt(unwellKey(n));
-    const cooldownUntil = !exhausted && unwellUntil > Date.now() ? unwellUntil : null;
-    const skipped = exhausted || cooldownUntil !== null;
-    return { name: n, used, quota, exhausted, remaining: skipped ? 0 : Math.max(0, quota - used), cooldownUntil };
+    const invalidReason = await authBadOf(n);
+    const cooldownUntil = !exhausted && !invalidReason && unwellUntil > Date.now() ? unwellUntil : null;
+    const status: KeyUsageView['status'] = invalidReason ? 'invalid' : exhausted ? 'exhausted' : cooldownUntil ? 'cooldown' : 'ok';
+    const skipped = exhausted || cooldownUntil !== null || invalidReason !== null;
+    return { name: n, used, quota, exhausted, remaining: skipped ? 0 : Math.max(0, quota - used), cooldownUntil, status, invalidReason: invalidReason ?? undefined };
   }));
   return {
     day: dayStamp(),
     keys,
-    totalUsed: keys.reduce((s, k) => s + Math.min(k.used, k.quota), 0),
+    totalUsed: keys.reduce((s2, k) => s2 + Math.min(k.used, k.quota), 0),
     totalQuota: names.length * quota,
+    ok: keys.some((k) => k.status === 'ok'),
   };
 }
 
@@ -213,6 +247,7 @@ async function callModelOnce(
   if (res.status === 404) throw new Error('model_missing');
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    if (res.status === 401 || res.status === 403) throw new AuthError(res.status, `Gemini ${res.status}: ${text.slice(0, 200)}`);
     throw new RetryableError(res.status, `Gemini ${res.status}: ${text.slice(0, 300)}`);
   }
   const data = (await res.json()) as any;
@@ -266,10 +301,20 @@ async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string
   // GEMINI_API_KEY_2 is only reached when the primary ERRORS (quota failure
   // marks it 20/20 and refuses it for the rest of the UTC day, so the ledger
   // itself tells us which key to start with — no status check is ever sent).
-  const infos = await Promise.all(geminiKeys().map(async (n) => ({ n, rem: await keyRemaining(n) })));
-  const keys = infos.filter((x) => x.rem > 0);
+  const infos = await Promise.all(geminiKeys().map(async (n) => ({
+    n, rem: await keyRemaining(n), authBad: await authBadOf(n), exhausted: (await storeGetInt(exhaustKey(n))) > 0,
+  })));
+  const authBad = infos.filter((x) => x.authBad);
+  const keys = infos.filter((x) => !x.authBad && x.rem > 0);
   if (!keys.length) {
-    throw new Error('Gemini daily quota exhausted on all keys — the shared budget resets at Pacific midnight');
+    if (infos.every((x) => x.authBad)) {
+      throw new Error(`Gemini API key rejected by Google (${authBad[0].authBad}) — update GEMINI_API_KEY in Settings or your Vercel environment variables.`);
+    }
+    const quota = infos.filter((x) => x.exhausted);
+    if (quota.length === infos.length) {
+      throw new Error('Gemini daily quota exhausted on all keys — the shared budget resets at Pacific midnight');
+    }
+    throw new Error('Gemini keys are cooling down after transient errors — try again in a few minutes (or update GEMINI_API_KEY in Settings).');
   }
   const deadModels = new Set<string>();
   for (const { n } of keys) {
@@ -284,6 +329,12 @@ async function dispatch(o: DispatchOpts, onAttempt?: AttemptLog): Promise<string
       } catch (err) {
         const e = err as Error;
         errs.push(`[${model}/${n}] ${e.message.slice(0, 140)}`);
+        if (e instanceof AuthError) {
+          onAttempt?.({ model, key: n, outcome: 'quota', detail: `key rejected: ${e.message.slice(0, 160)}` });
+          await markAuthBad(n, e.message);
+          quotaHit = true; // this key is unusable for the day — on to the next
+          break;
+        }
         if (e.message === 'model_missing') {
           onAttempt?.({ model, key: n, outcome: 'model-missing', detail: 'model not found (404)' });
           deadModels.add(model); // model is gone everywhere — next model, same key

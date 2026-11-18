@@ -17,7 +17,21 @@ export function Popover({
     <RPopover.Root>
       <RPopover.Trigger asChild>{trigger}</RPopover.Trigger>
       <RPopover.Portal>
-        <RPopover.Content sideOffset={8} collisionPadding={16} align={align} style={{ width: `min(${width}px, calc(100vw - 32px))` }} className={styles.panel}>
+        <RPopover.Content
+          sideOffset={8}
+          collisionPadding={16}
+          align={align}
+          style={{ width: `min(${width}px, calc(100vw - 32px))` }}
+          className={styles.panel}
+          tabIndex={-1}
+          onOpenAutoFocus={(e) => {
+            // Radix focuses the panel on open; on small screens the panel can
+            // flip above the trigger and the browser then scrolls the page to
+            // the top. Focus the panel ourselves WITHOUT scrolling.
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+          }}
+        >
           {children}
         </RPopover.Content>
       </RPopover.Portal>

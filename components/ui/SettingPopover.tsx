@@ -73,6 +73,11 @@ export function SettingPopover({
           align="start"
           style={{ width: `min(${width}px, calc(100vw - 32px))` }}
           className={styles.panel}
+          tabIndex={-1}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+          }}
         >
           {children}
         </RPopover.Content>

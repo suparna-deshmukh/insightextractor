@@ -95,3 +95,5 @@
 .point { fill: var(--chart-1); }
 .tipBox { fill: var(--bg-elevated); stroke: var(--line); }
 .tipText { font-size: 12px; fill: var(--ink); font-family: var(--font-ui); }
+
+.trendFallback { height: 180px; }

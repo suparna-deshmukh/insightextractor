@@ -5,4 +5,7 @@
   box-shadow: var(--shadow-pop);
   padding: 8px;
   z-index: var(--z-pop);
+  max-height: min(65vh, 640px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }

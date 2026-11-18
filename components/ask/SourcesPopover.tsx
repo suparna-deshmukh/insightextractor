@@ -204,7 +204,7 @@ export function SourcesPopover({
         >
           {copy.sources.reset}
         </button>
-        <Button variant="secondary" size="sm" onClick={onClose} autoFocus>
+        <Button variant="secondary" size="sm" onClick={onClose}>
           {copy.sources.done}
         </Button>
       </div>

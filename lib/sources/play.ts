@@ -133,14 +133,18 @@ async function scraperFetch(shards: string[], tf: TimeFrame, mode: PipelineMode)
     try {
       const count = mode === 'rapid' ? 40 : 80;
       const res = await playScraper.reviews({ appId: pkg, num: count, lang: 'en', country: 'us' });
+      const all = (res.data ?? []).slice(0, count);
+      const days = tf.preset === '7d' ? 7 : tf.preset === '30d' ? 30 : tf.preset === '90d' ? 90 : tf.preset === '1y' ? 365 : 3650;
+      const start = tf.preset === 'custom' ? tf.start ?? '' : new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+      const inWindow = all.filter((r) => !tf.preset || tf.preset === 'all' || !r.date || String(r.date).slice(0, 10) >= start);
+      // An app with no recent reviews still has signal in its older reviews —
+      // fall back to its most recent all-time reviews instead of failing hard.
+      const use = inWindow.length ? inWindow : all;
+      if (!use.length) { lastWarn = lastWarn ?? `${app}: no Play Store reviews found`; continue; }
+      if (!inWindow.length) lastWarn = lastWarn ?? `${app}: 0 reviews in the selected time frame — showing its ${use.length} most recent all-time reviews instead`;
       let n = 0;
-      for (const r of res.data ?? []) {
-        if (n >= count) break;
+      for (const r of use) {
         const date = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
-        if (tf.preset !== 'all' && date) {
-          const days = tf.preset === '7d' ? 7 : tf.preset === '30d' ? 30 : tf.preset === '90d' ? 90 : 365;
-          if (date < new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10)) continue;
-        }
         out.push({
           id: `play-scraper-${pkg}-${r.id ?? n}`,
           source: 'play',
@@ -154,7 +158,6 @@ async function scraperFetch(shards: string[], tf: TimeFrame, mode: PipelineMode)
         });
         n++;
       }
-      if (n === 0) lastWarn = lastWarn ?? `${app}: no reviews in the selected time frame`;
     } catch (err) {
       lastWarn = lastWarn ?? `${app}: ${err instanceof Error ? err.message : String(err)}`;
     }

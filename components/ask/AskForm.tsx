@@ -91,12 +91,37 @@ export function HomeView() {
     };
   }, [from, toast]);
 
-  // Draft autosave (debounced).
+  // Draft autosave — the question text is the part a user actually loses,
+  // so it persists immediately; the rest of the form is debounced. A
+  // pagehide flush covers closing the tab before the debounce fires.
+  const formRef = useRef(form);
+  formRef.current = form;
+  const descRef = useRef('');
+  const suppressFlushRef = useRef(false);
+  const persistDraft = useCallback(() => {
+    if (suppressFlushRef.current) return;
+    if (!formRef.current.description.trim()) {
+      descRef.current = formRef.current.description;
+      clearDraft();
+      return;
+    }
+    descRef.current = formRef.current.description;
+    saveDraft(formRef.current);
+  }, []);
   useEffect(() => {
     if (!ready) return;
-    const t = window.setTimeout(() => saveDraft(form), 500);
+    if (form.description !== descRef.current) {
+      persistDraft();
+      return;
+    }
+    const t = window.setTimeout(persistDraft, 500);
     return () => window.clearTimeout(t);
-  }, [form, ready]);
+  }, [form, ready, persistDraft]);
+  useEffect(() => {
+    const flush = () => persistDraft();
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, [persistDraft]);
 
   // Automatic source recommendation while the description changes.
   useEffect(() => {
@@ -138,6 +163,7 @@ export function HomeView() {
     const token = 'rt_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
     setInflight({ token, request: req, startedAt: Date.now() });
     clearDraft();
+    suppressFlushRef.current = true; // a hard navigation must not re-save the cleared draft
     router.push('/research/' + token);
   }, [form, router]);
 

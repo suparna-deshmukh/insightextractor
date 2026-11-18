@@ -1,5 +1,5 @@
 import { EvidenceRecord, Plan, PipelineMode, RedditAudit, RedditSpec, SourceId, TimeFrame } from '../types';
-import { httpText, stripHtml, redactUsers, clampDate } from './http';
+import { httpJson, httpText, stripHtml, redactUsers, clampDate } from './http';
 import { Provider } from './provider';
 import { dedupe } from './hn';
 
@@ -29,6 +29,14 @@ function tParam(tf: TimeFrame): string {
     case '1y': return 'year';
     default: return 'all';
   }
+}
+
+/** [start, end] as YYYY-MM-DD from the timeframe. */
+function windowDates(tf: TimeFrame): { start: string; end: string } {
+  const end = tf.preset === 'custom' && tf.end ? tf.end : new Date().toISOString().slice(0, 10);
+  const days = tf.preset === '7d' ? 7 : tf.preset === '30d' ? 30 : tf.preset === '90d' ? 90 : tf.preset === '1y' ? 365 : 3650;
+  const start = tf.preset === 'custom' && tf.start ? tf.start : new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  return { start, end };
 }
 
 // ---------------- the brief comes from the Gemini master plan (0 extra calls) ----------------
@@ -62,7 +70,7 @@ function specFromPlan(plan: Plan, mode: PipelineMode): RedditSpec {
 
 // Lexical relevance guard: drop scraped records that say nothing about the
 // topic/keywords/competitors — the cheap, hallucination-free filter.
-function relevantToPlan(r: EvidenceRecord, plan: Plan): boolean {
+export function relevantToPlan(r: EvidenceRecord, plan: Plan): boolean {
   const words = new Set<string>();
   const add = (s: string) => { for (const w of s.toLowerCase().split(/[^a-z0-9]+/)) if (w.length >= 3) words.add(w); };
   for (const k of plan.keywords) add(k);
@@ -74,55 +82,188 @@ function relevantToPlan(r: EvidenceRecord, plan: Plan): boolean {
   return false;
 }
 
-// ---------------- fetch routes (the "scrape" execution) ----------------
+/** Cheap token test used INSIDE the arctic provider (its `query` search is
+ * rate-limited, so listing + local filter is the reliable path). */
+function mentionsAny(text: string, words: string[]): boolean {
+  if (!words.length) return true;
+  const t = text.toLowerCase();
+  return words.some((w) => t.includes(w));
+}
 
-function parseRss(xml: string): EvidenceRecord[] {
-  const out: EvidenceRecord[] = [];
-  let idx = 0;
-  for (const e of xml.split('<entry>').slice(1)) {
-    const title = e.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '';
-    const link = e.match(/<link href="([^"]+)"/)?.[1] ?? '';
-    const updated = e.match(/<updated>([^<]+)<\/updated>/)?.[1] ?? '';
-    const content = e.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? '';
-    if (!title && !content) continue;
-    idx++;
-    out.push({
-      id: `reddit-${idx}-${encodeURIComponent(link || updated).slice(0, 48)}`,
-      source: 'reddit',
-      title: stripHtml(title),
-      body: redactUsers(stripHtml(content)).slice(0, 1200),
-      url: link,
-      author: '[user]',
-      date: clampDate(updated) ?? '',
-      score: 0,
-    });
+function planWords(plan: Plan): string[] {
+  const words = new Set<string>();
+  for (const s of [...plan.keywords, ...(plan.apps ?? []).map((a) => a.name)]) {
+    for (const w of s.toLowerCase().split(/[^a-z0-9]+/)) if (w.length >= 3) words.add(w);
   }
+  return [...words].slice(0, 12);
+}
+
+// ---------------- fetch routes ----------------
+// 2026-11 status of keyless Reddit access from datacenter egress:
+//   * www/old .reddit.com search(.rss/.json)  -> 404 / login-redirect (dead)
+//   * redlib mirrors                          -> decommissioned or behind JS challenges
+//   * pullpush                                -> up/down periodically (403/521 from DC IPs)
+//   * r.jina.ai reader of www.reddit          -> Reddit 403s even Jina's IPs
+//   * Arctic Shift archive (arctic-shift.photon-reddit.com)
+//       - posts/search?subreddit=X&query=Q    -> works, but the text index is
+//         rate-limited (HTTP 422 "slow down"); per-subreddit scans are reliable
+//       - posts/search?subreddit=X (no query) -> reliable listing, filter locally
+//       - subreddit=all&query=Q               -> works only for narrow windows
+// So the ladder is: Arctic Shift (subreddit-first, listing fallback) -> PullPush -> Jina.
+
+const ARCTIC = 'https://arctic-shift.photon-reddit.com/api';
+
+interface ArcticPost {
+  id?: string; title?: string; selftext?: string; permalink?: string;
+  subreddit?: string; author?: string; score?: number; created_utc?: number;
+}
+
+function toRecord(p: ArcticPost, source: string): EvidenceRecord | null {
+  if (!p.title && !p.selftext) return null;
+  const date = p.created_utc ? new Date(p.created_utc * 1000).toISOString().slice(0, 10) : '';
+  return {
+    id: `reddit-${source}-${p.id ?? Math.random().toString(36).slice(2, 10)}`,
+    source: 'reddit',
+    title: p.title ?? '',
+    body: redactUsers(String(p.selftext ?? '')).slice(0, 1200),
+    url: p.permalink ? `https://www.reddit.com${p.permalink}` : '',
+    author: p.subreddit ? `[r/${p.subreddit}]` : '[user]',
+    date,
+    score: p.score ?? 0,
+  };
+}
+
+async function arcticPosts(params: Record<string, string>, timeoutMs = 12_000): Promise<ArcticPost[]> {
+  const qs = new URLSearchParams(params).toString();
+  const data = await httpJson(`${ARCTIC}/posts/search?${qs}`, {}, timeoutMs);
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  return rows as ArcticPost[];
+}
+
+async function arcticSubExists(name: string): Promise<boolean> {
+  const clean = name.replace(/^r\//i, '').trim().replace(/[^A-Za-z0-9_]/g, '');
+  if (!clean) return false;
+  try {
+    const data = await httpJson(`${ARCTIC}/subreddits/search?subreddit=${encodeURIComponent(clean)}`, {}, 12_000);
+    return Array.isArray(data?.data) && data.data.length > 0;
+  } catch {
+    return false; // rate-limit or DNS — treat as "unknown", don't add
+  }
+}
+
+/**
+ * Candidate subreddits for the plan: the master plan's suggestions plus a
+ * deterministic probe of r/<topic> / r/<app> (a "Plaster" topic checks
+ * r/plaster). Probed names that don't exist are dropped — this keeps the
+ * heuristic path (no Gemini) from querying nothing.
+ */
+async function candidateSubs(plan: Plan): Promise<string[]> {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (s: string | undefined) => {
+    const clean = (s ?? '').replace(/^r\//i, '').trim().replace(/[^A-Za-z0-9_]/g, '');
+    if (clean && !seen.has(clean.toLowerCase())) { seen.add(clean.toLowerCase()); out.push(clean); }
+  };
+  for (const s of plan.subreddits ?? []) push(s);
+  const topicWords = (plan.keywords[0] ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  for (const a of plan.apps ?? []) push(a.name.split(/\s+/)[0]);
+  push(topicWords.slice(0, 2).join('_'));
+  return out.slice(0, 4);
+}
+
+/** One subreddit: query-search first, listing + local filter as the reliable fallback. */
+async function arcticSubreddit(sub: string, query: string, start: string, words: string[], cap: number): Promise<EvidenceRecord[]> {
+  const out: EvidenceRecord[] = [];
+  let rows: ArcticPost[] = [];
+  if (query) {
+    try {
+      rows = await arcticPosts({ subreddit: sub, query, after: start, limit: '100', sort: 'desc' }, 12_000);
+    } catch {
+      try {
+        rows = await arcticPosts({ subreddit: sub, query, after: start, limit: '100', sort: 'desc' }, 12_000); // one retry — the index is flaky
+      } catch {
+        rows = [];
+      }
+    }
+  }
+  const filtered = rows.filter((p) => mentionsAny(`${p.title ?? ''} ${p.selftext ?? ''}`, words));
+  if (filtered.length) {
+    for (const p of filtered.slice(0, cap)) { const r = toRecord(p, 'as'); if (r) out.push(r); }
+    return out;
+  }
+  // query index unavailable (422) — list recent posts and filter locally.
+  try {
+    const listed = await arcticPosts({ subreddit: sub, after: start, limit: '100', sort: 'desc' }, 12_000);
+    const local = listed.filter((p) => mentionsAny(`${p.title ?? ''} ${p.selftext ?? ''}`, words));
+    for (const p of local.slice(0, cap)) { const r = toRecord(p, 'as-list'); if (r) out.push(r); }
+  } catch { /* sub unreachable — next sub */ }
   return out;
 }
 
-async function rssSearch(shards: string[], host: string, tf: TimeFrame, _mode: PipelineMode): Promise<EvidenceRecord[]> {
-  const t = tParam(tf);
+/**
+ * `subreddit=all` text search, chunked by day (wide windows 422). Runs the
+ * most recent chunks in small parallel waves.
+ */
+async function arcticAll(query: string, start: string, end: string, cap: number, deadline: number): Promise<EvidenceRecord[]> {
+  const day = 86_400_000;
+  const endT = Date.parse(end + 'T00:00:00Z');
+  const startT = Math.min(Date.parse(start + 'T00:00:00Z'), endT - day);
+  const chunks: { a: string; b: string }[] = [];
+  for (let t = endT; t > startT; t -= 2 * day) {
+    const a = new Date(t - 2 * day).toISOString().slice(0, 10);
+    const b = new Date(t).toISOString().slice(0, 10);
+    chunks.push({ a, b });
+    if (chunks.length >= 8) break; // ~16 most recent days at 2-day resolution
+  }
   const out: EvidenceRecord[] = [];
-  for (const job of shards) {
-    let xml: string;
-    try {
-      xml = await httpText(`https://${host}/search.rss?q=${encodeURIComponent(job)}&limit=100&t=${t}`, {}, 20_000);
-    } catch (err) {
-      if ((err as Error).message.includes('429')) {
-        await new Promise((r) => setTimeout(r, 4000));
-        xml = await httpText(`https://${host}/search.rss?q=${encodeURIComponent(job)}&limit=100&t=${t}`, {}, 20_000);
-      } else throw err;
+  const seen = new Set<string>();
+  const wave = async (cs: { a: string; b: string }[]) => {
+    const results = await Promise.all(cs.map(async (c) => {
+      try {
+        const rows = await arcticPosts({ subreddit: 'all', query, after: c.a, before: c.b, limit: '25', sort: 'desc' }, 12_000);
+        return rows;
+      } catch { return [] as ArcticPost[]; }
+    }));
+    for (const rows of results) {
+      for (const p of rows) {
+        if (!p.id || seen.has(p.id)) continue;
+        seen.add(p.id);
+        const r = toRecord(p, 'as-all');
+        if (r) out.push(r);
+        if (out.length >= cap) return;
+      }
     }
-    out.push(...parseRss(xml));
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1500));
+  };
+  for (let i = 0; i < chunks.length && out.length < cap && Date.now() < deadline; i += 2) await wave(chunks.slice(i, i + 2));
+  return out;
+}
+
+async function arcticShift(shards: string[], plan: Plan, tf: TimeFrame, mode: PipelineMode): Promise<EvidenceRecord[]> {
+  const words = planWords(plan);
+  const { start, end } = windowDates(tf);
+  const cap = mode === 'rapid' ? 40 : 80;
+  const out: EvidenceRecord[] = [];
+  const deadline = Date.now() + 65_000; // stay inside the 90s provider cap with headroom
+  const subs = await candidateSubs(plan);
+  const query = shards[0] || plan.keywords[0] || '';
+  if (subs.length) {
+    for (const sub of subs.slice(0, 3)) {
+      if (Date.now() > deadline) break; // rate-limited archive — stop burning the budget
+      const recs = await arcticSubreddit(sub, query, start, words, cap);
+      out.push(...recs);
+      await new Promise((r) => setTimeout(r, 800));
+      if (out.length >= cap) break;
+    }
+  }
+  if (out.length < cap && query && Date.now() < deadline) {
+    out.push(...(await arcticAll(query, start, end, cap - out.length, deadline)));
   }
   return out;
 }
 
 async function pullpush(shards: string[], tf: TimeFrame, mode: PipelineMode): Promise<EvidenceRecord[]> {
-  const end = tf.preset === 'custom' && tf.end ? tf.end : new Date().toISOString().slice(0, 10);
-  const days = tf.preset === '7d' ? 7 : tf.preset === '30d' ? 30 : tf.preset === '90d' ? 90 : 365;
-  const after = tf.preset === 'custom' && tf.start ? tf.start : new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  const { start: after, end } = windowDates(tf);
   const out: EvidenceRecord[] = [];
   for (const job of shards) {
     const [q, subPart] = job.split(' sub:');
@@ -146,39 +287,6 @@ async function pullpush(shards: string[], tf: TimeFrame, mode: PipelineMode): Pr
     await new Promise((r) => setTimeout(r, 800));
   }
   return out;
-}
-
-const REDLIB_INSTANCES = ['redlib.catsarch.com', 'safereddit.com', 'redlib.perennialte.ch', 'rl.bloat.cat', 'red.artemislena.eu', 'redlib.nezumi.party'];
-
-async function redlib(shards: string[], tf: TimeFrame, _mode: PipelineMode): Promise<EvidenceRecord[]> {
-  const t = tParam(tf) === 'all' ? '' : `&t=${tParam(tf)}`;
-  for (const inst of REDLIB_INSTANCES) {
-    const out: EvidenceRecord[] = [];
-    try {
-      for (const job of shards) {
-        const html = await httpText(`https://${inst}/search?q=${encodeURIComponent(job)}&restrict_sr=off&sort=new${t}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36' },
-        }, 9_000);
-        const re = /<a[^>]+href="(\/r\/([A-Za-z0-9_]+)\/comments\/[A-Za-z0-9]+\/[^"]*)"[^>]*class="post_title"[^>]*>([\s\S]*?)<\/a>/g;
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(html)) !== null) {
-          out.push({
-            id: `reddit-rl-${encodeURIComponent(m[1]).slice(0, 70)}`,
-            source: 'reddit',
-            title: stripHtml(m[3]),
-            body: '',
-            url: `https://www.reddit.com${m[1]}`,
-            author: `[r/${m[2]}]`,
-            date: '',
-            score: 0,
-          });
-        }
-        await new Promise((r) => setTimeout(r, 700));
-      }
-      if (out.length) return dedupe(out);
-    } catch { /* next instance */ }
-  }
-  throw new Error('all Redlib instances unreachable');
 }
 
 async function jinaReader(shards: string[], tf: TimeFrame, mode: PipelineMode): Promise<EvidenceRecord[]> {
@@ -217,10 +325,8 @@ async function jinaReader(shards: string[], tf: TimeFrame, mode: PipelineMode): 
 }
 
 export const PROVIDERS: Provider[] = [
-  { id: 'rss-www', name: 'Reddit RSS (www)', requiresKey: undefined, fetch: (shards, _plan, tf, mode) => rssSearch(shards, 'www.reddit.com', tf, mode) },
-  { id: 'rss-old', name: 'Reddit RSS (old)', requiresKey: undefined, fetch: (shards, _plan, tf, mode) => rssSearch(shards, 'old.reddit.com', tf, mode) },
+  { id: 'arctic-shift', name: 'Arctic Shift archive', requiresKey: undefined, timeoutMs: 90_000, fetch: (shards, plan, tf, mode) => arcticShift(shards, plan, tf, mode) },
   { id: 'pullpush', name: 'PullPush archive', requiresKey: undefined, fetch: (shards, _plan, tf, mode) => pullpush(shards, tf, mode) },
-  { id: 'redlib', name: 'Redlib mirrors', requiresKey: undefined, fetch: (shards, _plan, tf, mode) => redlib(shards, tf, mode) },
   { id: 'jina', name: 'Jina reader', requiresKey: undefined, fetch: (shards, _plan, tf, mode) => jinaReader(shards, tf, mode) },
 ];
 
@@ -263,7 +369,7 @@ export async function runRedditChannel(
     all_params_satisfied: relevant.length >= spec.min_records && okRoutes > 0,
     gaps:
       relevant.length === 0
-        ? 'all reddit routes returned nothing in this window (network rate-block) — channel delivered 0, no fabrication'
+        ? 'all reddit routes returned nothing in this window (rate-limited archives — no fabrication)'
         : relevant.length < spec.min_records
           ? `delivered ${relevant.length}/${spec.min_records} minimum records — treat reddit signal as partial`
           : 'none material',
@@ -277,7 +383,7 @@ export async function runRedditChannel(
   return {
     source: 'reddit',
     records: relevant,
-    provider: relevant.length ? 'Gemini-brief channel (multi-route)' : null,
+    provider: relevant.length ? 'Arctic Shift archive (multi-route)' : null,
     attempts: fetchResult.attempts,
     warning: relevant.length ? undefined : okRoutes === 0 ? 'all reddit routes failed' : 'no relevant reddit records in this window',
     audit,
