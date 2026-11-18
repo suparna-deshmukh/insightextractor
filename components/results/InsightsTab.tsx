@@ -6,6 +6,7 @@ import type { StoredRun } from '@/lib/client/types';
 import { Prose } from './Prose';
 import { RailNav } from './RailNav';
 import { Section } from './Section';
+import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { ThemeList } from './ThemeList';
 const TrendChart = dynamic(() => import('./TrendChart').then((m) => m.TrendChart));
@@ -62,7 +63,11 @@ export function InsightsTab({
         heading: copy.results.sections.trends,
         body: (
           <>
-            {hasTrend && <TrendChart trend={result.trend} />}
+            {hasTrend && (
+              <Suspense fallback={<div className={styles.trendFallback} aria-hidden="true" />}>
+                <TrendChart trend={result.trend} />
+              </Suspense>
+            )}
             {trendsSec?.md && <Prose md={trendsSec.md} keywords={keywords} />}
           </>
         ),

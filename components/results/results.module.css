@@ -96,3 +96,10 @@
 
 .sectionHeading { font-size: var(--text-xl); font-weight: 600; margin: 48px 0 16px; scroll-margin-top: 96px; }
 .sheet-heading { margin-top: 32px; }
+
+.skelRows { display: grid; gap: 8px; padding: 8px 0; }
+.skelRow {
+  height: 44px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+}

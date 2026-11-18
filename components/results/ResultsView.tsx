@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as RTabs from '@radix-ui/react-tabs';
@@ -13,6 +13,10 @@ import { useRunMeta } from '@/lib/client/runmeta';
 import { useDocumentTitle } from '@/lib/client/useDocumentTitle';
 import type { StoredRun } from '@/lib/client/types';
 // PLAN-NOTE: 7.5 dynamic imports keep the results frame light on first load.
+// The heavy pieces render inside LOCAL Suspense boundaries (see below) so a
+// late chunk never suspends the page-level boundary and remounts the whole
+// results page — and the chunks are prefetched on mount so the first click
+// is synchronous.
 const MethodDrawer = dynamic(() => import('./MethodDrawer').then((m) => m.MethodDrawer));
 import { Notices } from './Notices';
 import { ResultHeader } from './ResultHeader';
@@ -21,8 +25,25 @@ import { InsightsTab } from './InsightsTab';
 const EvidenceTab = dynamic(() => import('./EvidenceTab').then((m) => m.EvidenceTab));
 import styles from './results.module.css';
 
+function EvidenceTabSkeleton() {
+  return (
+    <div className={styles.tabContent} aria-hidden="true">
+      <div className={styles.skelRows}>
+        <div className={styles.skelRow} />
+        <div className={styles.skelRow} />
+        <div className={styles.skelRow} />
+        <div className={styles.skelRow} />
+      </div>
+    </div>
+  );
+}
+
 export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnly?: boolean }) {
   const router = useRouter();
+  useEffect(() => {
+    void import('./EvidenceTab');
+    void import('./MethodDrawer');
+  }, []);
   const sp = useSearchParams();
   const toast = useToast();
   const { titleFor } = useRunMeta();
@@ -90,7 +111,9 @@ export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnl
           <h2 className={`${styles.sectionHeading} sheet-heading`}>{copy.results.sections.themes}</h2>
           <ThemeList buckets={result.buckets} fresh={fresh} onSeeAll={seeAllTheme} />
         </div>
+        <Suspense fallback={null}>
         <MethodDrawer run={run} open={methodOpen} onOpenChange={setMethodOpen} sections={sections} />
+      </Suspense>
       </div>
     );
   }
@@ -114,10 +137,14 @@ export function ResultsView({ run, readOnly = false }: { run: StoredRun; readOnl
           <InsightsTab run={run} sections={sections} fresh={fresh} onSeeAll={seeAllTheme} />
         </RTabs.Content>
         <RTabs.Content value="evidence" className={styles.tabContent}>
-          <EvidenceTab run={run} />
+          <Suspense fallback={<EvidenceTabSkeleton />}>
+            <EvidenceTab run={run} />
+          </Suspense>
         </RTabs.Content>
       </RTabs.Root>
-      <MethodDrawer run={run} open={methodOpen} onOpenChange={setMethodOpen} sections={sections} />
+      <Suspense fallback={null}>
+        <MethodDrawer run={run} open={methodOpen} onOpenChange={setMethodOpen} sections={sections} />
+      </Suspense>
     </div>
   );
 }
