@@ -92,3 +92,49 @@ describe('toSentenceCase', () => {
     expect(toSentenceCase('What to Do')).toBe('What to do');
   });
 });
+
+import { buildFallbackReport } from '@/lib/report';
+import type { BucketStats, EvidenceRecord, Plan, RunRequest } from '@/lib/types';
+
+const req = {
+  topic: 'Budgeting apps',
+  description: 'Why do people stop using budgeting apps after a few weeks?',
+  objective: 'problem-discovery' as const,
+  platforms: ['reddit', 'google'] as const,
+  timeframes: { default: { preset: '30d' as const } },
+} as unknown as RunRequest;
+
+const plan = { keywords: ['budgeting app'] } as unknown as Plan;
+
+function stats(quotes: EvidenceRecord[]): BucketStats[] {
+  return [
+    {
+      bucket: { id: 1, name: 'Retention friction', kind: 'pain', description: 'test bucket' },
+      count: 2, share: 100, avgScore: 10, positive: 0, negative: 1, neutral: 1,
+      bySource: [{ source: 'google', count: 2 }],
+      topQuotes: quotes,
+    },
+  ];
+}
+
+describe('buildFallbackReport voice of the user', () => {
+  it('never quotes Google Autocomplete search phrases as user voices', () => {
+    const md = buildFallbackReport(req, plan, stats([
+      { id: 'g1', source: 'google', title: 'why do people stop believing in god', body: 'Autocomplete suggestion for "Why do people stop" — indicates current search demand.', date: '2026-11-18', score: 5 } as EvidenceRecord,
+      { id: 'g2', source: 'google', title: 'why do people leave reviews', body: 'Autocomplete suggestion for "Why do people stop review".', date: '2026-11-18', score: 4 } as EvidenceRecord,
+    ]));
+    expect(md).not.toContain('believing in god');
+    expect(md).not.toContain('Autocomplete suggestion');
+    expect(md).toContain('No verbatim user statements');
+  });
+
+  it('quotes real user statements and skips autocomplete siblings', () => {
+    const md = buildFallbackReport(req, plan, stats([
+      { id: 'r1', source: 'reddit', title: 'I deleted the app', body: 'It stopped reminding me. Gave up after two months.', date: '2026-10-02', score: 12 } as EvidenceRecord,
+      { id: 'g1', source: 'google', title: 'why do people stop taking fosamax', body: 'Autocomplete suggestion.', date: '2026-11-18', score: 9 } as EvidenceRecord,
+    ]));
+    expect(md).toContain('I deleted the app');
+    expect(md).toContain('[Reddit, 2026-10-02]');
+    expect(md).not.toContain('fosamax');
+  });
+});

@@ -58,9 +58,19 @@ export function buildFallbackReport(req: RunRequest, plan: Plan, bucketStats: Bu
   else lines.push('- No explicit feature-request cluster found.');
   lines.push('');
   lines.push('## 6. VOICE OF THE USER');
-  for (const b of bucketStats.slice(0, 3)) {
+  const voiced = bucketStats.slice(0, 3).map((b) => ({
+    b,
+    // Google Autocomplete rows are search-demand signals, not user statements —
+    // never render them as "voice of the user" quotes.
+    quotes: b.topQuotes.filter((q) => q.source !== 'google').slice(0, 2),
+  }));
+  if (!voiced.some((x) => x.quotes.length)) {
+    lines.push('- No verbatim user statements in this window — the evidence is search-demand signal and aggregate data, not direct quotes.');
+  }
+  for (const { b, quotes } of voiced) {
+    if (!quotes.length) continue;
     lines.push(`**${b.bucket.name}**`);
-    for (const q of b.topQuotes.slice(0, 2)) lines.push(`- “${(q.title + ' ' + q.body).slice(0, 180)}…” _[${SOURCE_LABELS[q.source]}, ${q.date}]_`);
+    for (const q of quotes) lines.push(`- “${(q.title + ' ' + q.body).slice(0, 180)}…” _[${SOURCE_LABELS[q.source]}, ${q.date}]_`);
     lines.push('');
   }
   lines.push('## 7. MOMENTUM & TRENDS');
